@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>In the emulator — Hyper Rally (Konami, 1985)</title>
+<title>In the emulator — Konami&#x27;s Tennis (Konami, 1984)</title>
 <style>
 :root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
   --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
@@ -100,4 +100,4 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 <p>And it is what showed that the court script does not carry the font. Building the court on an empty VRAM left 1,514 bytes different, all of them letters and digits. The cartridge does not clear the patterns when it goes from the title to the court: it only clears the name table, at 0x4234. Starting the court from the title&#x27;s VRAM, as the cartridge does, took those 1,514 differences to zero.</p>
 <h2 id="following-the-ball-boy">Following the ball boy</h2>
 <p><code>work/sigue_sprites.tcl</code> follows 0xE03A, 0xE03B and 0xE03C and the sprite attributes at 0x3B3C. In two minutes of demo the ball boy never comes out: he needs 0xE0C0 or 0xE044 set, and neither happens. Writing 0xE0C0 by hand from the debugger brings him out, and his four sprites move with him — which is how &quot;he is made of sprites&quot; stopped being a reading of the code and became something seen.</p>
-<footer><p><em>Hyper Rally</em> was published by Konami for the MSX; its catalogue number is RC-718 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>
+<footer><p><em>Konami's Tennis</em> was published by Konami for the MSX; its catalogue number is RC-720 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

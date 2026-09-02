@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Empezar — Hyper Rally (Konami, 1985)</title>
+<title>Empezar — Konami&#x27;s Tennis (Konami, 1984)</title>
 <style>
 :root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
   --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
@@ -98,4 +98,4 @@ make web        rehace este sitio desde la ROM y las notas</code></pre>
 <h2 id="como-esta-montado">Cómo está montado</h2>
 <p>El listado no se edita a mano: <code>tools/mkasm.py</code> lo genera a partir de un trazado del flujo y de un fichero de notas ancladas a direcciones, así que los comentarios sobreviven a un retrazado. El trazador sigue el flujo desde los puntos de entrada; los que no puede deducir solo —sobre todo el gancho de la interrupción— están declarados en <code>src/tennis.entries</code>, cada uno con su justificación.</p>
 <p>Las imágenes de la portada no son capturas. Las dibuja <code>tools/graficos.py</code> ejecutando en Python los pasos del propio cartucho: los dos intérpretes de pantalla de <code>tools/guiones.py</code>, la copia de VRAM a VRAM de 0x442D y el descompresor de sprites de 0x5932. Y no se dan por buenas: <code>graficos.py --comprueba</code> vuelca la VRAM del emulador y la compara byte a byte.</p>
-<footer><p><em>Hyper Rally</em> lo publico Konami para MSX; su numero de catalogo es RC-718 y son 16 KB. Todos los derechos sobre el juego siguen siendo de sus titulares. Este trabajo es de preservacion, estudio y documentacion, y la imagen del cartucho no se distribuye.</p></footer></div>
+<footer><p><em>Konami's Tennis</em> lo publico Konami para MSX; su numero de catalogo es RC-720 y son 16 KB. Todos los derechos sobre el juego siguen siendo de sus titulares. Este trabajo es de preservacion, estudio y documentacion, y la imagen del cartucho no se distribuye.</p></footer></div>

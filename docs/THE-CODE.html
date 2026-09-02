@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The code — Hyper Rally (Konami, 1985)</title>
+<title>The code — Konami&#x27;s Tennis (Konami, 1984)</title>
 <style>
 :root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
   --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
@@ -113,4 +113,4 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 <p>There is no multiply or divide on a Z80, so the cartridge builds its own: 0x54AA shifts and subtracts eight times, 0x54CA shifts and adds sixteen, and 0x547E divides by counting how many times the divisor fits. The ball&#x27;s flight is built out of those three.</p>
 <h2 id="the-sound">The sound</h2>
 <p>Three channels, eleven bytes of state each from 0xE211. A tune is read by the high nibble of each byte: <code>0x1x</code> duration, <code>0x2x</code> volume, <code>0xDx</code> vibrato step, <code>0xEx</code> octave, <code>0xFx</code> vibrato width, <code>0xFE</code> up an octave, <code>0xFF</code> end. Anything else is a note — high nibble the semitone, low nibble the duration — and the period comes from the twelve-entry scale at 0x7C5D, doubled once per octave.</p>
-<footer><p><em>Hyper Rally</em> was published by Konami for the MSX; its catalogue number is RC-718 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>
+<footer><p><em>Konami's Tennis</em> was published by Konami for the MSX; its catalogue number is RC-720 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>
