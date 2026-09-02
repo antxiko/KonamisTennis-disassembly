@@ -180,15 +180,21 @@ HALLAZGOS = {
          'ahi, y el juego lo tapa despues.</p><p>El alfabeto tampoco es '
          'ASCII: la A es 0xD1 y de ahi seguido, sin la Q, y con la <b>X '
          'fuera de orden en 0xE8</b>, detras de la Y.</p>'),
-        ('La proteccion anticopia, la de siempre en la casa',
-         '<p>La unica escritura de toda la ROM a su propia pagina esta en '
-         '0x7A31 y cae sobre 0x409A, que es el <code>ret</code> del '
-         'manejador de interrupcion. En ROM no hace nada; en una copia en '
-         'RAM ese <code>ret</code> se vuelve <code>nop</code>, la '
-         'interrupcion cae en INIT y el juego se reinicia solo. Salta al '
-         'ganar un juego.</p><p>Konami lo hacia en muchos de sus cartuchos '
-         '-el <b>RC-701</b> lleva la misma idea con un <code>ldir</code>-, '
-         'asi que no es una rareza de este. Aqui esta sin parchear.</p>'),
+        ('La proteccion anticopia no salta al arrancar: salta al ganar un juego',
+         '<p>Lo llamativo no es que la lleve -Konami la ponia en muchos de sus '
+         'cartuchos, y el <b>RC-701</b> gasta la misma idea con un <code>ldir</code>- '
+         'sino <b>cuando salta</b>. La comprobacion no esta en el arranque, donde se '
+         'esperaria: esta en 0x7A31, dentro de la rutina que apunta un juego ganado. '
+         'O sea que una copia <b>arranca bien, ensena el titulo, deja elegir y deja '
+         'jugar</b>, y solo se rompe cuando alguien se lleva el primer juego. Para '
+         'entonces quien la ha copiado ya la ha dado por buena.</p>'
+         '<p>El mecanismo es de una sola instruccion: escribe un cero en <b>0x409A</b>, '
+         'que es el <code>ret</code> con el que acaba el manejador de interrupcion, y '
+         'en 0x409B empieza INIT. En ROM no hace nada, porque no se deja escribir; en '
+         'RAM ese <code>ret</code> se vuelve un <code>nop</code>, la interrupcion sigue '
+         'de largo y cae en INIT, con lo que <b>el juego se reinicia en cada cuadro</b>. '
+         'Es la unica escritura de toda la ROM a su propia pagina, y aqui esta sin '
+         'parchear.</p>'),
         ('No lleva la marca oculta de Konami',
          '<p>Konami escondia su numero de catalogo y el titulo en katakana '
          'al final de muchos cartuchos, en el offset 0x3FF0; lo descubrio '
@@ -266,15 +272,20 @@ HALLAZGOS = {
          'there, and the game paints over it.</p><p>The alphabet is not '
          'ASCII either: A is 0xD1 and on from there, with no Q, and with '
          '<b>X out of order at 0xE8</b>, behind the Y.</p>'),
-        ('The copy protection, the usual one in the house',
-         "<p>The ROM's only write into its own page is at 0x7A31 and lands "
-         'on 0x409A, the <code>ret</code> of the interrupt handler. In ROM '
-         'it does nothing; in a copy running from RAM that '
-         '<code>ret</code> becomes a <code>nop</code>, the interrupt falls '
-         'into INIT and the game restarts by itself. It fires on winning a '
-         'game.</p><p>Konami did this in many of its cartridges -the '
-         '<b>RC-701</b> carries the same idea with an <code>ldir</code>- '
-         'so it is no oddity of this one. Here it is unpatched.</p>'),
+        ('The copy protection does not fire on boot: it fires on winning a game',
+         '<p>The striking part is not that it has one -Konami put these in many of '
+         'its cartridges, and the <b>RC-701</b> uses the same idea with an '
+         '<code>ldir</code>- but <b>when it fires</b>. The check is not at boot, where '
+         'you would look for it: it is at 0x7A31, inside the routine that records a '
+         'game won. So a copy <b>boots fine, shows the title, lets you choose and lets '
+         'you play</b>, and only breaks once somebody takes the first game. By then '
+         'whoever copied it has already called it good.</p>'
+         '<p>The mechanism is one instruction: it writes a zero into <b>0x409A</b>, the '
+         '<code>ret</code> that ends the interrupt handler, with INIT starting at 0x409B. '
+         'In ROM it does nothing, because ROM will not take a write; in RAM that '
+         '<code>ret</code> becomes a <code>nop</code>, the interrupt runs straight on '
+         'into INIT, and <b>the game restarts on every frame</b>. It is the ROM&rsquo;s '
+         'only write into its own page, and here it is unpatched.</p>'),
         ("It does not carry Konami's hidden mark",
          '<p>Konami hid its catalogue number and the title in katakana at '
          'the end of many cartridges, at offset 0x3FF0; <b>Manuel '

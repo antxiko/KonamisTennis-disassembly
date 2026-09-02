@@ -73,15 +73,22 @@ en esa casilla, y el juego lo tapa después.
 El alfabeto tampoco es ASCII: la A es 0xD1 y de ahí seguido, sin la Q, y con la
 **X fuera de orden en 0xE8**, detrás de la Y. Las cifras son 0xF0 más el dígito.
 
-## La protección anticopia, la de siempre en la casa
+## La protección anticopia no salta al arrancar: salta al ganar un juego
 
-La única escritura de toda la ROM a su propia página está en 0x7A31 y cae sobre
-0x409A, que es el `ret` del manejador de interrupción. En ROM no hace nada; en
-una copia en RAM ese `ret` se vuelve `nop`, la interrupción cae en INIT y el
-juego se reinicia solo. Salta al ganar un juego.
+Lo llamativo no es que la lleve —Konami la ponía en muchos de sus cartuchos, y
+el RC-701 gasta la misma idea con un `ldir`— sino **cuándo salta**. La
+comprobación no está en el arranque, donde se esperaría: está en 0x7A31, dentro
+de la rutina que apunta un juego ganado. O sea que una copia **arranca bien,
+enseña el título, deja elegir y deja jugar**, y sólo se rompe cuando alguien se
+lleva el primer juego. Para entonces quien la ha copiado ya la ha dado por
+buena.
 
-Konami lo hacía en muchos de sus cartuchos —el RC-701 lleva la misma idea con un
-`ldir`—, así que no es una rareza de éste. Aquí está sin parchear.
+El mecanismo es de una sola instrucción: escribe un cero en **0x409A**, que es
+el `ret` con el que acaba el manejador de interrupción, y en 0x409B empieza
+INIT. En ROM no hace nada, porque no se deja escribir; en RAM ese `ret` se
+vuelve un `nop`, la interrupción sigue de largo y cae en INIT, con lo que **el
+juego se reinicia en cada cuadro**. Es la única escritura de toda la ROM a su
+propia página, y aquí está sin parchear.
 
 ## No lleva la marca oculta de Konami
 

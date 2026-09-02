@@ -70,15 +70,21 @@ written in that cell and the game paints over it.
 The alphabet is not ASCII: A is 0xD1 and on from there, with no Q, and with **X
 out of order at 0xE8**, behind the Y. Digits are 0xF0 plus the digit.
 
-## The copy protection, the usual one in the house
+## The copy protection does not fire on boot: it fires on winning a game
 
-The ROM's only write into its own page is at 0x7A31 and lands on 0x409A, the
-`ret` of the interrupt handler. In ROM it does nothing; in a copy running from
-RAM that `ret` becomes a `nop`, the interrupt falls into INIT and the game
-restarts by itself. It fires on winning a game.
+The striking part is not that it has one — Konami put these in many of its
+cartridges, and the RC-701 uses the same idea with an `ldir` — but **when it
+fires**. The check is not at boot, where you would look for it: it is at 0x7A31,
+inside the routine that records a game won. So a copy **boots fine, shows the
+title, lets you choose and lets you play**, and only breaks once somebody takes
+the first game. By then whoever copied it has already called it good.
 
-Konami did this in many of its cartridges — the RC-701 carries the same idea
-with an `ldir` — so it is no oddity of this one. Here it is unpatched.
+The mechanism is one instruction: it writes a zero into **0x409A**, the `ret`
+that ends the interrupt handler, with INIT starting at 0x409B. In ROM it does
+nothing, because ROM will not take a write; in RAM that `ret` becomes a `nop`,
+the interrupt runs straight on into INIT, and **the game restarts on every
+frame**. It is the ROM's only write into its own page, and here it is
+unpatched.
 
 ## It does not carry Konami's hidden mark
 
