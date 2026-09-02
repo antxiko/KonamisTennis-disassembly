@@ -1,0 +1,111 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Findings — Hyper Rally (Konami, 1985)</title>
+<style>
+:root{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;--linea:#23262e;
+  --rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+@media (prefers-color-scheme:light){:root{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;
+  --panel:#f7f6f2;--linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}}
+:root[data-theme="dark"]{--tinta:#cfd0d4;--suave:#83868f;--fondo:#000;--panel:#0c0e13;
+  --linea:#23262e;--rojo:#ff897d;--cyan:#65dbef;--verde:#3eb849;--oro:#ded087}
+:root[data-theme="light"]{--tinta:#191a1e;--suave:#5a5d66;--fondo:#e9e7e1;--panel:#f7f6f2;
+  --linea:#d0cdc5;--rojo:#b23f34;--cyan:#1c6b7c;--verde:#2b7734;--oro:#8a7420}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);padding:0 1.25rem 6rem;
+  font:15px/1.7 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.w{max-width:1120px;margin:0 auto}
+.n{max-width:68ch}
+h1,h2,h3,h4{font-weight:400;text-wrap:balance}
+a{color:var(--cyan)}
+img{image-rendering:pixelated;max-width:100%;height:auto;display:block}
+header.top{display:flex;flex-direction:column;align-items:center;gap:1.5rem;
+  padding:4rem 0 2rem;text-align:center}
+header.top img{width:min(100%,642px)}
+.claim{max-width:60ch;color:var(--suave);font-size:1.05rem}
+.claim b{color:var(--tinta);font-weight:400}
+.ficha{display:flex;flex-wrap:wrap;justify-content:center;gap:0 1.5rem;width:100%;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);
+  border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:.85rem 0}
+.ficha b{color:var(--rojo);font-weight:400}
+nav{display:flex;flex-wrap:wrap;gap:1.25rem;justify-content:center;padding:1.25rem 0;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+nav a{color:var(--suave);text-decoration:none;border-bottom:1px solid transparent}
+nav a:hover,nav a:focus{color:var(--tinta);border-bottom-color:var(--rojo)}
+nav.docs{border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);
+  margin-bottom:1rem}
+section{margin-top:4.5rem;scroll-margin-top:1rem}
+section>h2{font-size:1rem;letter-spacing:.1em;text-transform:uppercase;
+  border-left:3px solid var(--rojo);padding-left:.9rem;margin:0 0 1.5rem}
+.cifras{display:grid;gap:1px;background:var(--linea);border:1px solid var(--linea);
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifra{background:var(--panel);padding:1.1rem}
+.cifra b{display:block;font-size:1.7rem;color:var(--oro);font-weight:400;
+  font-variant-numeric:tabular-nums;line-height:1.2}
+.cifra span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--suave)}
+.hall{border-top:1px solid var(--linea);padding-top:1.75rem;margin-top:2.5rem}
+.hall:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.hall h3{margin:0 0 .75rem;font-size:1.15rem;color:var(--rojo)}
+.hall h4{color:var(--oro);margin:1.5rem 0 .5rem;font-size:.95rem}
+.hall p{margin:0 0 1rem}
+pre.asm{background:var(--panel);border-left:2px solid var(--verde);margin:1.25rem 0;
+  padding:1rem 1.1rem;overflow-x:auto;font-size:13px;line-height:1.6;color:var(--tinta)}
+.par{display:grid;gap:1.25rem;grid-template-columns:1fr}
+@media(min-width:820px){.par{grid-template-columns:1fr 1fr}}
+.par figure{margin:0}
+table{border-collapse:collapse;width:100%;margin:1.25rem 0;font-size:13px;display:block;
+  overflow-x:auto}
+th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--linea)}
+th{color:var(--suave);font-weight:400;font-size:11px;letter-spacing:.07em;text-transform:uppercase}
+td.num{font-variant-numeric:tabular-nums;color:var(--oro)}
+.nivel{margin-top:2rem}
+.nivel h3{margin:0 0 .9rem;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase}
+.nivel em{color:var(--cyan);font-style:normal}
+.sep{color:var(--suave);margin:0 .6rem}
+.rejilla{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.rejilla figure{margin:0;background:var(--panel);box-shadow:0 0 0 1px var(--linea)}
+.rejilla figcaption{display:flex;justify-content:space-between;padding:.45rem .65rem;
+  font-size:11px;color:var(--suave);border-top:1px solid var(--linea)}
+.dir{font-variant-numeric:tabular-nums;color:var(--verde)}
+footer{margin-top:5rem;padding-top:1.5rem;border-top:1px solid var(--linea);
+  color:var(--suave);font-size:12px}
+
+/* Aviso de trabajo en curso: tiene que verse antes que las cifras, porque un
+   100% mal leido hace mas dano que no ponerlo. */
+.aviso{background:#3a2a10;border-left:3px solid var(--oro);margin:1.5rem auto;
+  padding:1rem 1.2rem;max-width:900px;border-radius:4px}
+.aviso p{margin:0;color:var(--tinta);font-size:15px;line-height:1.65}
+.galeria{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin:1.5rem 0}
+.galeria figure{margin:0}
+.galeria img{width:100%;height:auto;image-rendering:pixelated;
+  border:1px solid var(--linea);border-radius:3px}
+.galeria figcaption{color:var(--suave);font-size:13px;margin-top:.5rem}
+audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
+</style>
+<div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html" style=color:var(--tinta)>Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/HALLAZGOS.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
+<h1 id="findings">Findings</h1>
+<h2 id="it-defends-itself-against-copies-by-writing-on-itself">It defends itself against copies by writing on itself</h2>
+<p>In the whole ROM there is <b>exactly one</b> instruction that writes into the cartridge&#x27;s own page, and it is at 0x7A31: <code>ld (0409ah),a</code>, with A zero.</p>
+<p>The address is not just any address. <b>0x409A is the <code>ret</code> that ends the interrupt handler</b>, and at 0x409B, right behind it, INIT begins.</p>
+<p>In a cartridge nothing happens: ROM will not take a write. In a copy loaded into RAM that <code>ret</code> becomes a <code>nop</code>, the interrupt runs straight on into INIT, and <b>the game restarts on every frame</b>. Nothing is checked and nothing is announced; it simply stops working.</p>
+<p>And it fires late — on winning a game — so a copy looks fine for a good while. It is the same idea the <b>RC-701</b> of this series uses, where it goes with an <code>ldir</code> over the dispatcher. Here it is unpatched and working.</p>
+<h2 id="the-screen-s-three-thirds-with-a-single-loop">The screen&#x27;s three thirds, with a single loop</h2>
+<p>0x442D copies VRAM to VRAM byte by byte, and is asked for <b>4,095</b> bytes from 0x0000 to 0x0800. Since the destination runs 0x800 ahead of the source, past the first block it is reading what it has just written. One loop, three identical thirds, 4 KB of data saved. Done twice: colours, then patterns.</p>
+<h2 id="the-colour-table-underneath-the-pattern-table">The colour table underneath the pattern table</h2>
+<p><code>R4 = 0x07</code> puts the patterns at 0x2000 and <code>R3 = 0x7F</code> the colours at 0x0000, because in SCREEN 2 those registers are a base bit and a mask, not an address. Read the other way round, the shapes still come out — the two blocks are symmetric — but the colours arrive in bands. That is the symptom.</p>
+<h2 id="the-chair-umpire-follows-the-ball-with-his-eyes">The chair umpire follows the ball with his eyes</h2>
+<p>He is 2x2 tiles of the name table, not a sprite. 0x6ED2 reads the ball&#x27;s position in 0xE0B7, splits the court into three with 0x48 and 0x78, and picks one of the three faces at 0x715D. Only the eyes differ.</p>
+<h2 id="the-opponent-misses-on-purpose">The opponent misses on purpose</h2>
+<p>0x6BE9 does <code>ld a,r</code>. R is the DRAM refresh counter, which the Z80 advances on every instruction, so it cannot be predicted. Rotated twice, it is the wobble in the opponent&#x27;s aim — and 0x6BEE leaves it at zero on half the frames.</p>
+<h2 id="the-difficulty-rises-with-the-rally">The difficulty rises with the rally</h2>
+<p>0xE20A counts the strokes. 0x6E3B halves it, caps it at fifteen, and looks it up in one of the three sixteen-step curves at 0x6E67. The longer the point runs, the better the machine plays.</p>
+<h2 id="six-bytes-of-code-in-the-sprite-table">Six bytes of code in the sprite table</h2>
+<p>0x4272 asks for 22 bytes of sprite attributes from 0x7890, where there are only 16 of data. The six that follow are the start of the routine at 0x78A0, and they go straight into VRAM at 0x3B3C, where they stay for the whole match. It does not show, because the patterns they point at are empty.</p>
+<h2 id="a-racket-nobody-draws">A racket nobody draws</h2>
+<p>Nine bytes at 0x61F5 decompress into a valid 16x16 sprite — a small racket. The word 0x61F5 appears nowhere in the ROM, in either byte order, and every pattern pointer is a 16-bit word. It matches none of the 189 patterns that are drawn.</p>
+<h2 id="every-counter-at-zero-means-256">Every counter at zero means 256</h2>
+<p>The scripts are full of zero lengths, and they are not empty blocks: <code>djnz</code> with B at zero runs 256 times. Read them as zeros and the script goes out of step within a few blocks.</p>
+<h2 id="ply-and-msx-or-1up-and-2up">PLY and MSX, or 1UP and 2UP</h2>
+<p>With one player the board reads PLY and MSX; with two people, 1UP and 2UP — the six tiles at 0x7760 and the six at 0x7766. The court script leaves <b>CPU</b> written in that cell and the game paints over it.</p>
+<p>The alphabet is not ASCII: A is 0xD1 and on from there, with no Q, and with <b>X out of order at 0xE8</b>, behind the Y. Digits are 0xF0 plus the digit.</p>
+<footer><p><em>Hyper Rally</em> was published by Konami for the MSX; its catalogue number is RC-718 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

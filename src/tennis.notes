@@ -1,0 +1,2473 @@
+
+# --- la proteccion anticopia ---
+# 0x7A31 es la unica instruccion de toda la ROM que escribe en la pagina del
+# cartucho, y lo que escribe es un cero en 0x409A, que es el `ret` con el que
+# acaba el manejador de interrupcion. En un cartucho no pasa nada: la ROM no se
+# deja escribir. Pero en una copia cargada en RAM ese `ret` se vuelve un `nop`,
+# la interrupcion sigue de largo y cae en 0x409B, que es INIT: el juego se
+# reinicia en cada cuadro. Y salta tarde, al ganar un juego, con lo que la
+# copia parece buena un buen rato. Es la misma idea del RC-701, que alli va con
+# un ldir sobre el despachador; en este cartucho esta sin parchear.
+C 0x7a30 el cero que se va a escribir
+7F los COLORES en
+# 0x0000, o sea al reves de la colocacion habitual. Nombres en 0x3800, patrones
+# de sprite en 0x1800 y atributos de sprite en 0x3B00.
+
+# --- la cabecera del cartucho ---
+D 0x4000 0x4010 cabecera_del_cartucho  AB, y la direccion de INIT; el resto a cero
+F 0x4000 w
+
+# --- tablas pequenas ---
+D 0x430f 0x431f tabla_de_bits  Un valor por cada combinacion de cuatro bits, para 0x4306
+F 0x430f 16
+D 0x43d0 0x43db cursor_del_menu  Los tiles de la flecha, de dos en dos, hasta el 0xFF
+F 0x43d0 11
+
+# --- los ocho registros del VDP ---
+D 0x45c9 0x45d1 registros_del_vdp  Los ocho que carga 0x411D: SCREEN 2, patrones en 0x2000 y colores en 0x0000
+F 0x45c9 8
+
+# --- las listas de tiles de la portada ---
+# Formato de 0x43EA: [direccion de VRAM, 2 bytes] y luego bytes al puerto,
+# con 0xFE [n] [b] para repetir y 0xFF para cerrar; dos 0xFF seguidos cierran
+# la lista. Las cuatro primeras las encadena 0x43DB con `ld b,004h`.
+# El alfabeto va en los tiles: A=0xD1 y de ahi seguido, pero SIN Q ni X, que no
+# se usan; los digitos en 0xF0+cifra, el espacio en 0x00 y la (c) en 0xEA.
+D 0x45d1 0x4611 pantalla_titulo  Konami's Tennis y (c)KONAMI 1984
+D 0x4611 0x462a rotulo_play_select  PLAY SELECT y la opcion 1PLAYER
+D 0x462a 0x4636 rotulo_2players  La opcion 2PLAYERS
+D 0x4636 0x4641 rotulo_doubles  La opcion DOUBLES
+D 0x4641 0x4650 rotulo_game_select  GAME SELECT, para el segundo menu
+D 0x4650 0x4662 rotulo_game_select_1  GAME SELECT con el 1
+D 0x4662 0x4674 rotulo_game_select_2  GAME SELECT con el 2
+D 0x4674 0x4686 rotulo_game_select_3  GAME SELECT con el 3
+
+# --- los guiones de pantalla ---
+# Formato de 0x445F: [cuantos bloques] y por bloque un comando:
+#   0  bytes crudos, con 0x11 [n] [b] de repeticion
+#   1  patrones por indice en la tabla de 0x489D, ocho bytes cada uno
+#   3  una direccion y luego pares [n] [b] de relleno
+#   *  una direccion, cuantas veces, y el puntero al patron de ocho bytes
+# Todo contador a 0 vale 256: el Z80 decrementa antes de comprobar.
+D 0x4686 0x489d guion_de_la_portada  Lo ejecuta INIT en 0x4137: patrones y colores del rotulo
+D 0x489d 0x49b5 tabla_de_patrones  35 patrones de ocho bytes, que el comando 1 pide por indice
+F 0x489d 8
+D 0x49b5 0x4ff1 guion_de_la_pista  Un solo guion, que 0x423E ejecuta para montar la pista
+
+# --- la pelota ---
+
+# --- las cuatro fichas de jugador ---
+# 0x57BE reparte estos 164 bytes en cuatro copias de 41, en 0xE100, 0xE130,
+# 0xE160 y 0xE190: son los cuatro jugadores del modo de dobles. Los bytes 0x10
+# a 0x23 de cada ficha son los veinte de atributos de sprite -y, x, patron y
+# color, por cada uno de los cinco- que 0x5920 vuelca al VDP.
+
+L 0x4010 interrupcion  Un cuadro entero del juego; lo engancha INIT en H.KEYI
+L 0x409b init  Engancha la interrupcion, limpia la RAM y arranca el cartucho
+L 0x4161 espera_del_titulo  Deja el rotulo puesto y va borrando la pantalla por filas
+L 0x41aa menu_de_jugadores  El PLAY SELECT: uno, dos o dobles
+L 0x41f6 menu_de_partido  El GAME SELECT: a cuantos juegos se juega
+L 0x4234 monta_la_pista  Deja la pantalla del partido lista y arranca el juego
+L 0x4291 lee_joystick  Devuelve los ocho sentidos y el disparo del mando que se pida
+L 0x42a3 lee_teclado_como_mando  Las flechas y el espacio, en el formato del joystick
+L 0x42e7 lee_una_fila  Lee la fila E, la traduce, y le suma el disparo de la fila D
+L 0x42fa traduce_direccion  Los cuatro bits de las flechas, a un sentido de ocho
+L 0x431f lee_los_mandos  Deja en 0xE105 y 0xE135 lo que hacen los dos jugadores
+L 0x435e lee_para_el_menu  Lo mismo, pero para moverse por las opciones
+L 0x4373 mueve_el_cursor  Sube o baja la opcion elegida, y la resalta
+L 0x43b7 pinta_el_cursor  Deja la flecha en la fila que toca
+L 0x43db pinta_cuatro_listas  Borra la pantalla y pinta cuatro listas seguidas
+L 0x43ea pinta_lista_de_tiles  Vuelca una lista de tiles en la tabla de nombres
+L 0x441a borra_la_pantalla  Deja los 768 tiles de la tabla de nombres a cero
+L 0x442d replica_vram  Copia de VRAM a VRAM byte a byte, y de paso replica los tercios
+L 0x4456 manda_orden  Deja una orden en 0xE001 y no vuelve hasta que la interrupcion la hace
+L 0x445f ejecuta_guion  El interprete de guiones: monta una pantalla entera
+L 0x4475 guion_bytes_crudos  Comando 0: bytes al VDP, con repeticion
+L 0x4496 guion_repite_byte  El 0x11 del comando 0: N veces el mismo byte
+L 0x44ac guion_patrones  Comando 1: patrones pedidos por su numero
+L 0x44d7 guion_relleno  Comando 3: una direccion y pares de cuenta y valor
+L 0x44ea guion_patron_repetido  Cualquier otro comando: un patron, muchas veces
+L 0x4505 pon_destino  Lee una direccion de VRAM de dos bytes y deja el VDP escribiendo ahi
+L 0x450b escribe_tira  Suelta B tiles consecutivos y baja una fila
+L 0x4524 borra_ram  Deja BC bytes a cero desde HL
+L 0x452c esconde_sprites  Manda los 32 sprites fuera de la pantalla
+L 0x4535 espera_confirmacion  Deja el rotulo parpadeando hasta que el jugador confirme
+L 0x455e suma_a_hl  HL += A, que es como se indexa todo en este cartucho
+L 0x4563 pon_escritura_con_reintento  SETWRT, y si la interrupcion se cuela, otra vez
+L 0x457b pon_lectura  SETRD, con el mismo reintento
+L 0x458c pon_escritura  SETWRT, con el mismo reintento
+L 0x459d escribe_bloque_en  Coloca el puntero y suelta B bytes desde HL
+L 0x45a0 escribe_bloque  Suelta B bytes desde HL, donde este el puntero
+L 0x45ad escribe_bloque_simple  Como el anterior, con la version corta de SETWRT
+L 0x45b2 rellena_en  Coloca el puntero y repite el byte C, B veces
+L 0x45b6 rellena  Repite el byte A, B veces, donde este el puntero
+L 0x45c3 rellena_desde  Coloca el puntero y repite el byte C, B veces
+ecuta para montar la pista
+D 0x4ff1 0x51fe tiles_de_la_pista  La tabla de nombres de la pista, en el formato de 0x43EA
+
+# --- la pelota ---
+D 0x550a 0x5512 datos_550a  Ocho bytes que lee 0x753B
+F 0x550a 8
+D 0x5512 0x5516 tabla_de_dificultad  Un valor por opcion de menu, que lee la interrupcion en 0x4065
+F 0x5512 4
+D 0x5516 0x5528 datos_5516  Dieciocho bytes que lee 0x5492
+F 0x5516 18
+D 0x5528 0x553c tabla_de_la_pelota  Cinco pares de punteros: la pelota crece con la altura
+F 0x5528 4
+D 0x553c 0x555d patrones_de_la_pelota  Los cinco tamanos, comprimidos para 0x5932
+
+# --- las cuatro fichas de jugador ---
+# 0x57BE reparte estos 164 bytes en cuatro copias de 41, en 0xE100, 0xE130,
+# 0xE160 y 0xE190: son los cuatro jugadores del modo de dobles. Los bytes 0x10
+# a 0x23 de cada ficha son los veinte de atributos de sprite -y, x, patron y
+# color, por cada uno de los cinco- que 0x5920 vuelca al VDP.
+D 0x57eb 0x588f fichas_de_los_jugadores  Cuatro fichas de 41 bytes, una por jugador
+F 0x57eb 41
+
+# --- las figuras del jugador ---
+# Una figura son CINCO sprites de 16x16 apilados: 0x58A9 recorre cinco
+# punteros (`ld b,005h`) descomprimiendo 32 bytes en cada vuelta, y 0x58D4
+# salta esos diez bytes (`ld a,00ah`) para llegar al sexto, que apunta a las
+# cinco parejas (y,x) con el sitio de cada uno. La compresion es la de 0x5932:
+# 0x00 [n] son n bytes a cero, y el resto va tal cual.
+D 0x5961 0x59d5 tabla_de_posturas  58 punteros a descripcion; los indices 26 a 31 estan a cero
+F 0x5961 w
+D 0x59d5 0x59e1 descripcion_59d5  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x59d5 w
+D 0x59e1 0x59ed descripcion_59e1  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x59e1 w
+D 0x59ed 0x59f9 descripcion_59ed  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x59ed w
+D 0x59f9 0x5a05 descripcion_59f9  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x59f9 w
+D 0x5a05 0x5a11 descripcion_5a05  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a05 w
+D 0x5a11 0x5a1d descripcion_5a11  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a11 w
+D 0x5a1d 0x5a29 descripcion_5a1d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a1d w
+D 0x5a29 0x5a35 descripcion_5a29  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a29 w
+D 0x5a35 0x5a41 descripcion_5a35  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a35 w
+D 0x5a41 0x5a4d descripcion_5a41  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a41 w
+D 0x5a4d 0x5a59 descripcion_5a4d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a4d w
+D 0x5a59 0x5a65 descripcion_5a59  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a59 w
+D 0x5a65 0x5a71 descripcion_5a65  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a65 w
+D 0x5a71 0x5a7d descripcion_5a71  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a71 w
+D 0x5a7d 0x5a89 descripcion_5a7d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a7d w
+D 0x5a89 0x5a95 descripcion_5a89  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a89 w
+D 0x5a95 0x5aa1 descripcion_5a95  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5a95 w
+D 0x5aa1 0x5aad descripcion_5aa1  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5aa1 w
+D 0x5aad 0x5ab9 descripcion_5aad  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5aad w
+D 0x5ab9 0x5ac5 descripcion_5ab9  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5ab9 w
+D 0x5ac5 0x5ad1 descripcion_5ac5  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5ac5 w
+D 0x5ad1 0x5add descripcion_5ad1  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5ad1 w
+D 0x5add 0x5ae9 descripcion_5add  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5add w
+D 0x5ae9 0x5af5 descripcion_5ae9  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5ae9 w
+D 0x5af5 0x5b01 descripcion_5af5  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5af5 w
+D 0x5b01 0x5b0d descripcion_5b01  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b01 w
+D 0x5b0d 0x5b19 descripcion_5b0d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b0d w
+D 0x5b19 0x5b25 descripcion_5b19  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b19 w
+D 0x5b25 0x5b31 descripcion_5b25  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b25 w
+D 0x5b31 0x5b3d descripcion_5b31  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b31 w
+D 0x5b3d 0x5b49 descripcion_5b3d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b3d w
+D 0x5b49 0x5b55 descripcion_5b49  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b49 w
+D 0x5b55 0x5b61 descripcion_5b55  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b55 w
+D 0x5b61 0x5b6d descripcion_5b61  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b61 w
+D 0x5b6d 0x5b79 descripcion_5b6d  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b6d w
+D 0x5b79 0x5b85 descripcion_5b79  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b79 w
+D 0x5b85 0x5b91 descripcion_5b85  Cinco punteros a patron y uno a las parejas (y,x)
+F 0x5b85 w
+D 0x5be2 0x5bec parejas_5be2  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5be2 2
+D 0x5c0d 0x5c17 parejas_5c0d  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5c0d 2
+D 0x5c79 0x5c83 parejas_5c79  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5c79 2
+D 0x5cae 0x5cb8 parejas_5cae  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5cae 2
+D 0x5d03 0x5d0d parejas_5d03  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5d03 2
+D 0x5d69 0x5d73 parejas_5d69  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5d69 2
+D 0x5dc7 0x5dd1 parejas_5dc7  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5dc7 2
+D 0x5e2b 0x5e35 parejas_5e2b  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5e2b 2
+D 0x5e56 0x5e60 parejas_5e56  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5e56 2
+D 0x5ebf 0x5ec9 parejas_5ebf  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5ebf 2
+D 0x5f0c 0x5f16 parejas_5f0c  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5f0c 2
+D 0x5f6d 0x5f77 parejas_5f6d  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5f6d 2
+D 0x5fd4 0x5fde parejas_5fd4  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x5fd4 2
+D 0x6027 0x6031 parejas_6027  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6027 2
+D 0x6078 0x6082 parejas_6078  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6078 2
+D 0x60ce 0x60d8 parejas_60ce  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x60ce 2
+D 0x6127 0x6131 parejas_6127  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6127 2
+D 0x618e 0x6198 parejas_618e  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x618e 2
+D 0x61be 0x61c8 parejas_61be  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x61be 2
+D 0x6225 0x622f parejas_6225  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6225 2
+D 0x6280 0x628a parejas_6280  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6280 2
+D 0x62b9 0x62c3 parejas_62b9  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x62b9 2
+D 0x6318 0x6322 parejas_6318  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6318 2
+D 0x635f 0x6369 parejas_635f  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x635f 2
+D 0x63b4 0x63be parejas_63b4  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x63b4 2
+D 0x63da 0x63e4 parejas_63da  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x63da 2
+D 0x6433 0x643d parejas_6433  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6433 2
+D 0x6494 0x649e parejas_6494  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6494 2
+D 0x64ef 0x64f9 parejas_64ef  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x64ef 2
+D 0x6558 0x6562 parejas_6558  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6558 2
+D 0x65a7 0x65b1 parejas_65a7  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x65a7 2
+D 0x65f9 0x6603 parejas_65f9  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x65f9 2
+D 0x6648 0x6652 parejas_6648  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6648 2
+D 0x669c 0x66a6 parejas_669c  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x669c 2
+D 0x66e4 0x66ee parejas_66e4  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x66e4 2
+D 0x6734 0x673e parejas_6734  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6734 2
+D 0x6783 0x678d parejas_6783  Las cinco (y,x) de una figura, con signo; 0xCF esconde el sprite
+F 0x6783 2
+D 0x5b91 0x5b9b patron_5b91  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5b9b 0x5bb1 patron_5b9b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5bb1 0x5bbd patron_5bb1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5bbd 0x5bdb patron_5bbd  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5bdb 0x5be2 patron_5bdb  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5bec 0x5c06 patron_5bec  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c06 0x5c0d patron_5c06  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c17 0x5c24 patron_5c17  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c24 0x5c3e patron_5c24  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c3e 0x5c4b patron_5c3e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c4b 0x5c67 patron_5c4b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c67 0x5c79 patron_5c67  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5c83 0x5ca1 patron_5c83  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5ca1 0x5cae patron_5ca1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5cb8 0x5cda patron_5cb8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5cda 0x5cf2 patron_5cda  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5cf2 0x5d03 patron_5cf2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d0d 0x5d1a patron_5d0d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d1a 0x5d36 patron_5d1a  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d36 0x5d49 patron_5d36  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d49 0x5d5c patron_5d49  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d5c 0x5d69 patron_5d5c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d73 0x5d7f patron_5d73  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d7f 0x5d92 patron_5d7f  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d92 0x5d9d patron_5d92  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5d9d 0x5db8 patron_5d9d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5db8 0x5dc7 patron_5db8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5dd1 0x5dde patron_5dd1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5dde 0x5df1 patron_5dde  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5df1 0x5e07 patron_5df1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e07 0x5e1d patron_5e07  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e1d 0x5e2b patron_5e1d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e35 0x5e4f patron_5e35  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e4f 0x5e56 patron_5e4f  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e60 0x5e6d patron_5e60  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e6d 0x5e84 patron_5e6d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e84 0x5e94 patron_5e84  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5e94 0x5eb0 patron_5e94  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5eb0 0x5ebf patron_5eb0  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5ec9 0x5ede patron_5ec9  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5ede 0x5eed patron_5ede  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5eed 0x5f05 patron_5eed  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f05 0x5f0c patron_5f05  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f16 0x5f23 patron_5f16  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f23 0x5f3d patron_5f23  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f3d 0x5f4d patron_5f3d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f4d 0x5f65 patron_5f4d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f65 0x5f6d patron_5f65  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f77 0x5f83 patron_5f77  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5f83 0x5fa0 patron_5f83  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5fa0 0x5fb3 patron_5fa0  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5fb3 0x5fc6 patron_5fb3  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5fc6 0x5fd4 patron_5fc6  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5fde 0x5fea patron_5fde  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5fea 0x5ff8 patron_5fea  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x5ff8 0x6004 patron_5ff8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6004 0x601b patron_6004  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x601b 0x6027 patron_601b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6031 0x603c patron_6031  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x603c 0x6053 patron_603c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6053 0x605e patron_6053  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x605e 0x6070 patron_605e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6070 0x6078 patron_6070  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6082 0x608c patron_6082  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x608c 0x60a1 patron_608c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60a1 0x60b3 patron_60a1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60b3 0x60c6 patron_60b3  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60c6 0x60ce patron_60c6  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60d8 0x60e2 patron_60d8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60e2 0x60f8 patron_60e2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x60f8 0x6104 patron_60f8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6104 0x611c patron_6104  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x611c 0x6127 patron_611c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6131 0x6143 patron_6131  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6143 0x6168 patron_6143  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6168 0x6173 patron_6168  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6173 0x6187 patron_6173  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6187 0x618e patron_6187  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6198 0x61b7 patron_6198  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x61b7 0x61be patron_61b7  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x61c8 0x61da patron_61c8  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x61da 0x61f5 patron_61da  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x61fe 0x6219 patron_61fe  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6219 0x6225 patron_6219  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x622f 0x623b patron_622f  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x623b 0x625d patron_623b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x625d 0x6272 patron_625d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6272 0x6280 patron_6272  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x628a 0x629f patron_628a  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x629f 0x62b2 patron_629f  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x62b2 0x62b9 patron_62b2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x62c3 0x62ce patron_62c3  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x62ce 0x62ec patron_62ce  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x62ec 0x62fa patron_62ec  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x62fa 0x630c patron_62fa  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x630c 0x6318 patron_630c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6322 0x6339 patron_6322  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6339 0x6343 patron_6339  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6343 0x6358 patron_6343  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6358 0x635f patron_6358  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6369 0x6373 patron_6369  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6373 0x6389 patron_6373  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6389 0x6396 patron_6389  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6396 0x63ad patron_6396  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x63ad 0x63b4 patron_63ad  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x63be 0x63d3 patron_63be  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x63d3 0x63da patron_63d3  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x63e4 0x63ee patron_63e4  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x63ee 0x6405 patron_63ee  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6405 0x640f patron_6405  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x640f 0x6425 patron_640f  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6425 0x6433 patron_6425  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x643d 0x6448 patron_643d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6448 0x6462 patron_6448  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6462 0x6476 patron_6462  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6476 0x648d patron_6476  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x648d 0x6494 patron_648d  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x649e 0x64a9 patron_649e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x64a9 0x64c1 patron_64a9  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x64c1 0x64cd patron_64c1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x64cd 0x64e2 patron_64cd  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x64e2 0x64ef patron_64e2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x64f9 0x6509 patron_64f9  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6509 0x6526 patron_6509  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6526 0x6534 patron_6526  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6534 0x654b patron_6534  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x654b 0x6558 patron_654b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6562 0x6573 patron_6562  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6573 0x6589 patron_6573  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6589 0x6591 patron_6589  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6591 0x65a0 patron_6591  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65a0 0x65a7 patron_65a0  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65b1 0x65ba patron_65b1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65ba 0x65d2 patron_65ba  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65d2 0x65dd patron_65d2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65dd 0x65f1 patron_65dd  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x65f1 0x65f9 patron_65f1  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6603 0x660c patron_6603  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x660c 0x6624 patron_660c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6624 0x6631 patron_6624  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6631 0x6641 patron_6631  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6641 0x6648 patron_6641  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6652 0x665c patron_6652  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x665c 0x6671 patron_665c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6671 0x667b patron_6671  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x667b 0x6692 patron_667b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6692 0x669c patron_6692  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66a6 0x66b0 patron_66a6  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66b0 0x66c2 patron_66b0  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66c2 0x66cb patron_66c2  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66cb 0x66dd patron_66cb  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66dd 0x66e4 patron_66dd  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66ee 0x66fe patron_66ee  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x66fe 0x670e patron_66fe  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x670e 0x671a patron_670e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x671a 0x672c patron_671a  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x672c 0x6734 patron_672c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x673e 0x6748 patron_673e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x6748 0x675e patron_6748  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x675e 0x676b patron_675e  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x676b 0x677c patron_676b  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+D 0x677c 0x6783 patron_677c  Un sprite de 16x16 comprimido, 32 bytes al descomprimir
+
+
+D 0x61f5 0x61fe raqueta_sin_usar  Se descomprime a un sprite valido -una raqueta pequena- pero ninguna descripcion de postura lo apunta: sobra en el cartucho
+
+
+# --- los mensajes del partido y el tanteo ---
+# 0x7438 y 0x7445 buscan en la tabla de 0x763A con el indice por dos. Cada
+# mensaje empieza por su direccion de VRAM y sigue en el alfabeto de tiles.
+D 0x763a 0x7654 tabla_de_mensajes  13 punteros a los rotulos del partido
+F 0x763a w
+D 0x7654 0x76d7 mensajes_del_partido  DOUBLE FAULT, IN, OUT, NET, DEUCE, GAME, LET, 1ST, 2ND, FINAL
+D 0x76d7 0x76fb tabla_de_tanteos  18 punteros, uno por punto del juego
+F 0x76d7 w
+D 0x76fb 0x76ff tanteos  Los cinco del tenis: 00, 15, 30, 40 y la A de ventaja
+
+# --- donde se coloca cada jugador al empezar ---
+# 0x71A3 copia ocho bytes a 0xE052 y de ahi a las fichas: cuatro parejas
+# (y,x), una por jugador, y 0xCF esconde al que no juega.
+D 0x76ff 0x771f puestos_individuales  Cuatro bloques de ocho: las parejas (y,x) de salida
+F 0x76ff 8
+D 0x771f 0x773f puestos_dobles  Lo mismo para el modo de dobles
+F 0x771f 8
+D 0x773f 0x774f atributos_de_la_derecha  Cuatro sprites en x=216, con los patrones 0x3C a 0x48
+F 0x773f 4
+D 0x774f 0x7755 tiles_recogepelotas_sale  Los seis tiles que le abren hueco al salir
+F 0x774f 6
+D 0x7755 0x775b tiles_recogepelotas_vuelve  Los seis que devuelven el fondo al recogerse
+F 0x7755 6
+D 0x775b 0x7760 arranque_de_la_pelota  Los cinco valores que 0x7545 copia a 0xE0AC al empezar el punto
+F 0x775b 5
+D 0x7760 0x7766 rotulos_del_marcador  PLY y MSX, los dos bandos del tanteo; la pista viene con CPU escrito y esto lo tapa
+F 0x7760 3
+D 0x7766 0x776c rotulos_de_dos_jugadores  1UP y 2UP, los que sustituyen a PLY y MSX cuando juegan dos personas
+F 0x7766 6
+
+# --- la segunda familia de figuras ---
+# Estas no llevan tabla de parejas: son [cuantas dibujar] y CINCO punteros
+# fijos, y 0x78A0 las descomprime seguidas en la VRAM desde 0x1960, o sea
+# los patrones de sprite 0x2C en adelante.
+D 0x776c 0x7776 tabla_de_figuras_2  5 punteros a grupo
+F 0x776c w
+D 0x7776 0x7781 grupo_7776  Cuantas capas dibujar y los cinco punteros
+D 0x7781 0x778c grupo_7781  Cuantas capas dibujar y los cinco punteros
+D 0x778c 0x7797 grupo_778c  Cuantas capas dibujar y los cinco punteros
+D 0x7797 0x77a2 grupo_7797  Cuantas capas dibujar y los cinco punteros
+D 0x77a2 0x77ad grupo_77a2  Cuantas capas dibujar y los cinco punteros
+D 0x77ad 0x77af patron2_77ad  Un sprite de 16x16 comprimido
+D 0x77af 0x77bf patron2_77af  Un sprite de 16x16 comprimido
+D 0x77bf 0x77c1 patron2_77bf  Un sprite de 16x16 comprimido
+D 0x77c1 0x77c3 patron2_77c1  Un sprite de 16x16 comprimido
+D 0x77c3 0x77c5 patron2_77c3  Un sprite de 16x16 comprimido
+D 0x77cb 0x77df patron2_77cb  Un sprite de 16x16 comprimido
+D 0x77df 0x77f1 patron2_77df  Un sprite de 16x16 comprimido
+D 0x77f1 0x77f8 patron2_77f1  Un sprite de 16x16 comprimido
+D 0x77f8 0x77ff patron2_77f8  Un sprite de 16x16 comprimido
+D 0x77ff 0x7807 patron2_77ff  Un sprite de 16x16 comprimido
+D 0x7807 0x7818 patron2_7807  Un sprite de 16x16 comprimido
+D 0x7818 0x7822 patron2_7818  Un sprite de 16x16 comprimido
+D 0x7822 0x7829 patron2_7822  Un sprite de 16x16 comprimido
+D 0x7829 0x7831 patron2_7829  Un sprite de 16x16 comprimido
+D 0x7831 0x7845 patron2_7831  Un sprite de 16x16 comprimido
+D 0x7845 0x7855 patron2_7845  Un sprite de 16x16 comprimido
+D 0x7855 0x785c patron2_7855  Un sprite de 16x16 comprimido
+D 0x785c 0x7863 patron2_785c  Un sprite de 16x16 comprimido
+D 0x7864 0x7877 patron2_7864  Un sprite de 16x16 comprimido
+D 0x7877 0x7881 patron2_7877  Un sprite de 16x16 comprimido
+D 0x7881 0x7888 patron2_7881  Un sprite de 16x16 comprimido
+D 0x7888 0x7890 patron2_7888  Un sprite de 16x16 comprimido
+D 0x7890 0x78a0 atributos_del_recogepelotas  Cuatro sprites escondidos (y=0xCF) con los patrones 0x2C a 0x38. OJO: 0x4272 pide 22 bytes y aqui solo hay 16, asi que se lleva a la VRAM los seis primeros de 0x78A0
+F 0x7890 4
+
+# --- el sonido ---
+# 0x7C3C busca la nota en la tabla de doce y la sube de octava a base de
+# `add hl,hl`, y luego la escribe en los registros de tono del PSG.
+D 0x7c5d 0x7c69 escala_cromatica  Los doce semitonos, del mas grave al mas agudo
+F 0x7c5d 12
+D 0x7c69 0x7c9b tabla_de_melodias  25 punteros; 0x7A96 indexa desde 0x7C67, o sea que la entrada 0 se pisa con las dos ultimas notas y no se usa
+F 0x7c69 w
+D 0x7c9b 0x7ee9 melodias  Las musicas y los efectos del partido
+
+# --- lo que queda ---
+D 0x6aa7 0x6ac3 efectos_del_golpe  Cuatro bytes por clase de golpe: los que 0x69B0 copia a 0xE0AA
+F 0x6aa7 4
+D 0x6ac3 0x6acb umbrales_del_efecto  Ocho umbrales, cuatro por cada lado de la red, que lee 0x68D4
+F 0x6ac3 4
+D 0x6b09 0x6b25 rectangulos_de_alcance  Siete rectangulos de cuatro bytes con signo, para 0x6ACB
+F 0x6b09 4
+D 0x6e61 0x6e67 tabla_de_dificultad  Un puntero por opcion del GAME SELECT
+F 0x6e61 w
+D 0x6e67 0x6e97 curvas_de_dificultad  Tres curvas de dieciseis pasos: la dificultad sube con lo que dura el peloteo
+F 0x6e67 16
+D 0x715d 0x7169 posturas_del_juez  Las tres caras del juez de silla, de 2x2 tiles: los ojos a un lado, al otro y cerrados
+F 0x715d 4
+D 0x790a 0x7932 colores_del_aviso  Dos juegos de cuatro tiles: 0x746F los alterna y asi parpadea el rotulo de falta
+F 0x790a 8
+D 0x7fe9 0x8000 relleno_final  Veintitres bytes a 0xFF: lo que sobra del cartucho
+
+# Dos huecos que ningun puntero de la tabla de 0x776C alcanza. Los patrones
+# vacios de 0x77C1 y 0x77C3 -dos bytes cada uno, `00 20` y `00 00`- son las
+# capas que un grupo declara pero no dibuja; estos bytes quedan detras.
+D 0x77c5 0x77cb sin_alcanzar_77c5  Seis bytes entre patrones a los que no apunta nadie
+D 0x7863 0x7864 sin_alcanzar_7863  Un byte entre patrones al que no apunta nadie
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x4010 lee el estado del VDP, que es lo que reconoce la interrupcion
+C 0x4013 0xE01D avisa de que el VDP esta ocupado con la interrupcion
+C 0x4019 si 0xE01E esta puesto, alguien esta a medias con el VDP y no se toca
+C 0x401c lee los dos mandos y el teclado
+C 0x401f si hay menu en marcha, va por su rutina y no por la del juego
+C 0x402a 0xE060 corta el juego mientras dura un aviso
+C 0x4033 el sonido suena en todos los cuadros, pase lo que pase
+C 0x4037 0xE00C lo pone a uno el final de la interrupcion anterior
+C 0x4041 0xE000 es el contador de cuadros
+C 0x4046 cada 32 cuadros baja el reloj de 0xE001
+C 0x404c 0xE0E1 es otra cuenta atras, la del aviso
+C 0x4056 0xE003 dice si hay partida en marcha
+C 0x405c 0xE0D9 reparte el trabajo entre cuadros: no todo cabe en uno
+C 0x4062 0xE0DA guarda la opcion elegida en el menu
+C 0x4065 la dificultad sale de la tabla de 0x5512, indexada por esa opcion
+C 0x4070 y a partir de aqui, las nueve tareas del cuadro, en orden
+C 0x4073 mueve la pelota
+C 0x407c dibuja las figuras
+C 0x407f pinta lo que haya cambiado en la pantalla
+C 0x408b si la interrupcion se ha comido el cuadro entero, vuelve a empezar
+C 0x4092 deja 0xE00C a uno para que el siguiente cuadro haga el trabajo
+C 0x409b nada de interrupciones hasta tener el gancho puesto
+C 0x409c H.KEYI (0xFD9A) es el gancho de la BIOS para la interrupcion
+C 0x409f un 0xC3 es un jp, y detras va la direccion
+C 0x40a1 el manejador es 0x4010
+C 0x40a7 borra de 0xE000 a 0xE3FE con el truco del ldir solapado
+C 0x40b0 el primer byte a cero, y el ldir lo arrastra
+C 0x40b3 y la pila se queda justo encima de lo borrado
+C 0x40b4 0xE210 arranca con 0xB8
+C 0x40bc apaga los tres canales de tono del PSG
+C 0x40c2 registros 8, 9 y 10: los volumenes
+C 0x40ce el registro 15 del PSG es el que manda al puerto de los mandos
+C 0x40d5 apaga el piloto de CAPS, por si venia encendido
+C 0x40d8 modo 1 de interrupcion, el del MSX
+C 0x40ed 0xE003 a cero: todavia no hay partida
+C 0x40f1 pone la pantalla en SCREEN 2
+C 0x40f4 esconde los 32 sprites
+C 0x40f8 limpia 256 bytes de 0xE020
+C 0x4107 borra la tabla de nombres a base de escribir 0 tres veces 256
+C 0x4115 lee el PSG para dejarlo en un estado conocido
+C 0x411d los ocho registros del VDP, de la tabla de 0x45C9
+C 0x4124 WRTVDP quiere el valor en B y el numero de registro en C
+C 0x412d 0xE01E libre otra vez: ya se puede usar el VDP
+C 0x4133 manda la orden 1 a la interrupcion y espera a que la haga
+C 0x4137 el guion de la portada: patrones y colores del rotulo
+C 0x413d y aqui el truco: copia 4095 bytes de VRAM a VRAM, solapados
+C 0x4140 los colores del primer tercio se replican en los otros dos
+C 0x4146 y lo mismo con los patrones, que estan en 0x2000
+C 0x414f orden 13 a la interrupcion: la musica del titulo
+C 0x4155 0xE006 dice si venimos de una partida o del arranque
+C 0x4161 0xE000 es el contador de cuadros
+C 0x4165 solo actua uno de cada cuatro cuadros
+C 0x4169 y adelanta el contador dos, para no repetir
+C 0x416b 0xE260 es la fila de la tabla de nombres que toca borrar
+C 0x416f cuando llega a 0x386B ya no queda pantalla que borrar
+C 0x4179 apaga los canales 3, 11 y 12 del PSG
+C 0x418e borra la fila entera
+C 0x4192 y sube una fila: 0x20 bytes menos
+C 0x4199 si se pasa por abajo, se acabo
+C 0x41aa pinta las cuatro listas de tiles del titulo
+C 0x41b0 0xE008 lleva el cursor de este menu
+C 0x41b8 ocho unidades de reloj para decidir
+C 0x41bd mientras haya reloj, atiende al mando
+C 0x41c6 0xE002 se queda a 1 si el jugador ha elegido de verdad
+C 0x41cf si el reloj se agota sin tocar nada, entra la demostracion
+C 0x41d8 0xE00A guarda cuantos jugadores hay
+C 0x41e3 y segun eso resalta 1PLAYER, 2PLAYERS o DOUBLES
+C 0x41f2 deja la eleccion parpadeando hasta que se confirme
+C 0x41f6 si nadie eligio jugadores, este menu se salta
+C 0x41fc pinta el rotulo GAME SELECT
+C 0x4202 y debajo, otra vez las tres opciones
+C 0x4208 0xE010 lleva el cursor de este otro menu
+C 0x421a 0xE012 es el numero de juegos elegido
+C 0x421e y se copia a 0xE0DA, que es de donde lo lee la interrupcion
+C 0x4222 resalta la opcion elegida
+C 0x4234 borra la tabla de nombres
+C 0x4238 la musica de empezar
+C 0x423e el primer byte de 0x49B5 dice cuantos guiones seguidos hay
+C 0x4245 y cada uno se ejecuta con las interrupciones cortadas
+C 0x424c otra vez la replica solapada, ahora para la pista
+C 0x4263 y encima, la tabla de nombres de la pista
+C 0x4269 coloca a los jugadores donde toca
+C 0x426c 0xE03A arranca en 0xD84F
+C 0x4272 los atributos de los sprites de la derecha
+C 0x4275 a la VRAM 0x3B2C, o sea a partir del sprite 11
+C 0x4278 OJO: pide 22 bytes y en 0x7890 solo hay 16 de datos
+C 0x427d carga los patrones de esas figuras
+C 0x4284 espera a que 0xE213 diga que ya esta todo puesto
+C 0x428b 0xE003 a uno: ya hay partida
+C 0x4291 el mando 1 se selecciona con 0x8F y el 2 con 0xCF
+C 0x4297 el registro 15 del PSG elige que mando se lee
+C 0x429c y el 14 devuelve lo que tiene
+C 0x42a1 el PSG da los bits al reves, asi que se invierten
+C 0x42a3 las filas 2, 5, 3 y 6 de la matriz son donde caen las teclas
+C 0x42aa SNSMAT devuelve una fila entera de ocho teclas
+C 0x42ad la matriz tambien da los bits al reves
+C 0x42c6 recoloca los bits para que salgan como los del mando
+C 0x42cb y arregla los dos que no encajan del todo
+C 0x42ec traduce los cuatro bits de direccion
+C 0x42f5 el disparo viene de otra fila distinta
+C 0x42fa C acumula el bit del disparo
+C 0x42fc el primer bit que sale es el de disparo
+C 0x4301 y los cuatro siguientes son las flechas
+C 0x4306 la tabla de 0x430F tiene una entrada por combinacion
+C 0x430d y se le devuelve el disparo pegado
+C 0x431f dos vueltas, una por jugador
+C 0x4321 0xE105 es el mando del primero
+C 0x4327 se queda con los seis bits que importan
+C 0x432a 0xE135 es el del segundo
+C 0x4330 y el teclado tambien vale como mando del primero
+C 0x4337 se mezcla con lo que dijo el joystick
+C 0x433e el segundo jugador usa las otras teclas
+C 0x4349 y ahora, guardar tambien lo que habia antes
+C 0x434e para saber si una direccion es nueva o venia de antes
+C 0x435f el mando manda
+C 0x4364 0xE005 es lo que ve el menu
+C 0x4367 si el mando no dice nada, se prueba el teclado
+C 0x4369 las filas 7 y 8, que son las de las flechas
+C 0x4373 si no se toca nada, no hay nada que hacer
+C 0x437b el bit 0 marca que ya se movio con esta pulsacion
+C 0x4381 los bits 4 y 5 son disparo: eso es elegir, no mover
+C 0x4389 los bits 0 y 1 son arriba y abajo
+C 0x438b deja la marca de que ya se ha movido
+C 0x4390 la opcion baja de una en una
+C 0x4394 y el cursor sube 0x40 en la tabla de nombres
+C 0x4398 si se sale por arriba, vuelve a la tercera
+C 0x43a4 y por el otro lado, igual
+C 0x43a7 hay tres opciones, de 1 a 3
+C 0x43b9 DE sale de la variable que se le pasa
+C 0x43bc la flecha son parejas de tiles, hasta el 0xFF
+C 0x43c6 dos tiles por fila
+C 0x43ca y la siguiente fila, 0x40 mas abajo
+C 0x43dc primero deja la tabla de nombres a cero
+C 0x43e0 las listas del titulo son cuatro, una detras de otra
+C 0x43eb el puerto de datos del VDP, guardado en el juego alterno
+C 0x43f1 cada entrada empieza por su direccion de VRAM
+C 0x43f5 un 0xFE es la orden de repetir
+C 0x43fb cuantas veces
+C 0x43fd y que byte
+C 0x4407 un 0xFF cierra la entrada
+C 0x440c y si no era ninguno de los dos, el byte va tal cual
+C 0x4411 dos 0xFF seguidos cierran la lista entera
+C 0x441b la tabla de nombres empieza en 0x3800
+C 0x4421 tres vueltas
+C 0x4424 con B a cero, el djnz da 256: 3 x 256 = 768
+C 0x442d 4095 bytes, uno menos que un bloque entero
+C 0x4431 se guardan los dos puertos del VDP en el juego alterno
+C 0x4434 el de escritura
+C 0x4438 y el de lectura
+C 0x443a coloca el puntero de lectura
+C 0x4440 y saca el byte
+C 0x4443 ahora le toca al otro puntero
+C 0x4445 coloca el de escritura
+C 0x444c y lo suelta
+C 0x444f vuelve a cambiar, que el bucle sigue
+C 0x4453 el destino va 0x800 por delante del origen, asi que a mitad
+C 0x4455 de camino esta leyendo lo que el mismo acaba de escribir
+C 0x4459 0xE001 es el buzon
+C 0x445a y aqui se espera a que lo vacien
+C 0x445f el primer byte dice cuantos bloques hay
+C 0x4462 y cada bloque empieza por su comando
+C 0x4465 el 0 son bytes crudos
+C 0x4468 el 1, patrones por indice
+C 0x446c el 3, pares de relleno
+C 0x446e y cualquier otro, un patron repetido
+C 0x4472 hasta agotar los bloques
+C 0x4475 cuantos sub-bloques
+C 0x4478 cada uno con su direccion de VRAM
+C 0x447c y su longitud; un 0 aqui significa 256
+C 0x447f un 0x11 es la orden de repetir
+C 0x4485 el puerto de escritura, del juego alterno
+C 0x448e descuenta del total del sub-bloque
+C 0x4492 y al siguiente
+C 0x4497 cuantas veces
+C 0x4499 y que byte
+C 0x44a5 el total del sub-bloque manda sobre la cuenta de repeticiones
+C 0x44a8 y si no, se repite lo que diga
+C 0x44ac cuantos grupos
+C 0x44af la direccion de VRAM del grupo
+C 0x44b3 y aqui el numero de patron
+C 0x44b5 la tabla vive en 0x489D
+C 0x44bc ocho bytes por patron, asi que se avanza de ocho en ocho
+C 0x44c5 y se sueltan los ocho
+C 0x44cb hasta que aparezca un 0xFF
+C 0x44d4 el 0xFF del ultimo grupo tambien hay que saltarlo
+C 0x44d7 cuantos pares
+C 0x44d9 y una sola direccion para todos
+C 0x44de la cuenta
+C 0x44e0 y el valor
+C 0x44ee cuantas veces
+C 0x44f0 y de donde sale el patron
+C 0x44f8 ocho bytes cada vez
+C 0x44fd sin avanzar: es siempre el mismo
+C 0x450c coloca el puntero
+C 0x4517 cada tile, uno mas que el anterior
+C 0x451e y al acabar, 32 bytes mas abajo: la fila siguiente
+C 0x4527 el primero a mano, y el ldir arrastra
+C 0x452c los atributos empiezan en 0x3B00
+C 0x452f 128 bytes con 0xCF, que es una fila que no se ve
+C 0x4536 0xE000 lleva la cuenta de cuadros
+C 0x453d el bit 3 del contador es el que hace el parpadeo
+C 0x4547 26 tiles de ancho
+C 0x4552 mientras tanto, sigue leyendo los mandos
+C 0x4558 el bit 6 de 0xE000 dice que ya se ha confirmado
+C 0x4564 0xE01D lo pone la interrupcion cuando toca el VDP
+C 0x4568 0xE01E avisa de que estamos a medias
+C 0x456c SETWRT de la BIOS quiere la direccion en HL
+C 0x4571 si la interrupcion movio el puntero, se repite
+C 0x4580 SETRD de la BIOS
+C 0x4591 SETWRT de la BIOS
+C 0x45a1 el puerto de datos del VDP
+C 0x45a6 y adentro
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x51fe mueve_la_pelota  Un paso del vuelo: avanza, rebota y decide donde cae
+C 0x51fe 0xE0D8 dice si hay pelota en juego
+C 0x5203 0xE045 corta el vuelo mientras haya un aviso en pantalla
+C 0x5208 0xE0D9 reparte el trabajo entre cuadros
+C 0x520c si toca la mitad de abajo, solo se redibuja
+C 0x520f 0xE0DB pide recalcular la trayectoria desde cero
+C 0x5217 y se apaga en cuanto se atiende
+C 0x521e 0xE0D7 lleva el sentido del avance y se invierte en cada golpe
+C 0x5223 saca de la tabla los parametros de este golpe
+C 0x5229 0xE0AB es la fuerza con la que sale
+C 0x522f y 0xE0AD la componente que le toca a un eje
+C 0x5232 multiplica una por otra
+C 0x523e y lo mismo con el otro eje
+C 0x5247 0xE0B5 acumula el recorrido, y empieza a cero
+C 0x524d 0xE0D2 es el acumulador de la multiplicacion
+C 0x5255 aqui se hace la cuenta
+C 0x525e el resultado del primer eje pasa a ser el multiplicando
+C 0x5268 y otra vuelta
+C 0x5274 0xE0BB es la altura de la sombra, la que se queda en el suelo
+C 0x5278 0xE0B7 es la de la pelota; su resta ES la altura del bote
+C 0x5287 diez, que es la gravedad de este cartucho
+C 0x5298 divide para repartir el avance entre los cuadros
+C 0x529b segun el sentido, el avance suma o resta
+C 0x52a4 0xE0DD queda con la posicion nueva
+C 0x52b4 0x54 es la altura de la red
+L 0x52c7 la_pelota_se_para  Se acabo el punto: suena, se apunta y se recoloca
+C 0x52c7 el sonido de fin de punto
+C 0x52cc 0xE0A6 marca que la pelota ya no vuela
+C 0x52d4 sube el contador de botes
+C 0x52da 0xE062 evita que se cuente el punto dos veces
+C 0x52e8 0xE042 dice si el punto lo gano el de arriba o el de abajo
+C 0x52f7 0x14 es el rozamiento normal
+C 0x52f9 0xE0C0 sube el rozamiento cuando la pelota va por el suelo
+C 0x5305 y en la hierba frena el doble
+C 0x530d 0xE04F es el saque
+C 0x5313 con lo que casi no frena
+C 0x531c y el maximo frenazo
+C 0x531e resta el rozamiento a lo que quedaba de recorrido
+C 0x5321 si se pasa de cero, la pelota se para del todo
+C 0x5327 0xB3 es el tope por abajo de la pista
+C 0x5333 0xE0D8 a cero: fuera de juego
+C 0x533c y 0xE041 avisa de que hay que repartir el punto
+L 0x5341 sigue_el_vuelo  Un cuadro mas de la parabola
+C 0x5341 si ya se paro, va por el otro lado
+L 0x5347 avanza_un_paso  Suma el paso del cuadro a la posicion y comprueba la red
+C 0x5347 0xE0B2 lleva la direccion del golpe
+C 0x534a 0xE0A4 es el angulo, que va girando
+C 0x5350 intercambia los dos bytes: el alto pasa a bajo
+C 0x5359 el angulo nuevo se guarda para el cuadro siguiente
+C 0x5363 0xE0D7 vuelve a decidir el signo
+C 0x536d suma el paso a la pelota
+C 0x5373 y el mismo paso a su sombra
+C 0x5378 0xE0A0 es el bloque de la velocidad que va cayendo
+C 0x537f la velocidad baja en cada cuadro
+C 0x5389 y cuando se agota, se recarga del siguiente escalon
+C 0x5391 con el resto de la division anterior
+C 0x5397 hasta que no quede acarreo
+C 0x539a 0xE0B8 es la coordenada del otro eje
+C 0x539f si se sale por un lado o por el otro, punto
+C 0x53ab 0xE0B5 acumula la caida: catorce por cuadro
+C 0x53b7 0xE0B3 es la altura de salida
+C 0x53ba y otra vez el intercambio de bytes
+C 0x53c3 0xE0A7 marca si la resta salio negativa
+C 0x53c9 la altura de ahora menos lo que ha caido
+C 0x53d1 si salio al reves, se le da la vuelta y se apunta
+C 0x53d8 0xE0D0 recibe el resultado para la siguiente cuenta
+C 0x53e5 0xE0BF guarda el alto de la parabola
+C 0x53f1 y aqui se recupera el signo
+C 0x53f8 0xD0 significa que la pelota no esta en la pista
+C 0x5401 compara la pelota con su sombra
+C 0x540c 0xE0A6 a uno: la pelota ha tocado el suelo
+C 0x5412 y la sombra se pone donde la pelota
+L 0x5416 dibuja_la_pelota  La pinta del tamano que le toca segun lo alta que vaya
+C 0x5416 B contara el escalon de tamano
+C 0x5418 si no hay sombra, no hay pelota que pintar
+C 0x541f la altura es la pelota menos su sombra
+C 0x5423 tres escalones: 0x21, 0x0F y 0x06
+C 0x5427 cuanto mas alta, mas pequena se ve
+C 0x5432 0x38 es el fondo de la pista
+C 0x5438 0xE042 dice de quien es el punto
+C 0x543f y en ese caso se salta dos escalones
+C 0x5445 sin pasar del cuarto
+C 0x5447 la tabla de 0x5528 tiene un par de punteros por escalon
+C 0x544b cuatro bytes por entrada
+C 0x5456 el primero va a la VRAM 0x1800: el patron de la pelota
+C 0x5461 y el segundo a 0x1BE0, que es su sombra
+C 0x546a 0xD0 otra vez: fuera de la pista, nada que colocar
+C 0x5470 los atributos del sprite 31, el ultimo
+C 0x5476 y los del sprite 0, el primero
+L 0x5479 pon_atributos  Deja los cuatro bytes de un sprite en la VRAM
+C 0x5479 y, x, patron y color
+L 0x547e divide_por_restas  Divide contando cuantas veces cabe, que es lo que hay sin divisor
+C 0x547e 0xE0A3 es el resto que va quedando
+C 0x5482 y 0xE0A1 el divisor
+C 0x5487 mientras quepa, una vez mas
+C 0x5489 y en cuanto no cabe, se acabo
+C 0x548e va sumando el paso de cada vuelta
+L 0x5492 parametros_del_golpe  Saca de la tabla la fuerza y el efecto de este golpe
+C 0x5492 la tabla vive en 0x5516
+C 0x5495 0xE0D6 es la clase de golpe
+C 0x5498 dos bytes por entrada
+C 0x549d 0xE0A0 recibe los tres valores
+L 0x54a8 pon_28_y_multiplica  Deja un 0x28 y entra en la multiplicacion corta
+L 0x54aa multiplica_8  Multiplica a base de desplazar y restar, ocho vueltas
+C 0x54ab ocho bits, ocho vueltas
+C 0x54ad 0xE0D2 es el acumulador
+C 0x54b1 tres bytes de ancho
+C 0x54b3 desplaza el acumulador entero un bit
+C 0x54b6 byte a byte, con el acarreo pasando de uno a otro
+C 0x54ba 0xE0D3 es el divisor de esta vuelta
+C 0x54be si cabe, se resta
+C 0x54c3 y se apunta el bit del cociente
+C 0x54c5 hasta agotar los ocho
+L 0x54ca multiplica_16  Lo mismo, pero con dieciseis vueltas y sumando
+C 0x54cb dieciseis bits
+C 0x54d1 desplaza los tres bytes del acumulador
+C 0x54d9 y solo suma cuando sale un uno
+C 0x54db el sumando, empezando por el byte bajo
+C 0x54e4 y los acarreos hacia arriba
+C 0x54ec hasta las dieciseis
+L 0x54f0 multiplica_y_devuelve  Multiplica y deja el resultado en HL
+L 0x54fa multiplica_y_devuelve_alto  Igual, pero devuelve la parte alta
+L 0x5500 prepara_multiplicacion  Coloca el multiplicando y pone el acumulador a cero
+C 0x5503 0xE0D2 empieza siempre limpio
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x555d turno_de_los_jugadores  Le da un cuadro a cada jugador que este en la pista
+C 0x555d las fichas viven todas en la pagina 0xE1
+C 0x555f con dos jugadores no hay pareja que mover
+C 0x5564 el contador de cuadros reparte el trabajo
+C 0x5567 0xE160 es el tercero
+C 0x5569 uno de cada cuatro cuadros
+C 0x556f y el cuarto solo existe en dobles
+C 0x5575 0xE190
+C 0x557a el segundo va en otro cuadro distinto
+C 0x5582 0xE100, el primero
+C 0x5587 0xE00E dice cuantos jugadores hay
+C 0x558a con uno solo, aqui se acaba
+C 0x558c 0xE130, el segundo
+L 0x558f mueve_un_jugador  Un cuadro de un jugador: decide, anda y golpea
+C 0x5592 IX es la ficha, y asi se queda hasta el final
+C 0x5594 si le toca a este, va por el camino largo
+C 0x5596 pensar, andar y pegarle a la pelota
+C 0x559c y dibujarlo
+C 0x55a2 los dos bits de arriba son hacia donde mira
+C 0x55a6 mueve sin redibujar
+C 0x55ab conserva los bits de estado y le pone la cara nueva
+C 0x55b7 y coloca sus cinco sprites
+L 0x55bd piensa_y_mueve  Las cuatro cosas que hace un jugador en un cuadro
+C 0x55bd andar
+C 0x55c0 cambiar de cuadro de animacion
+C 0x55c3 elegir el dibujo
+C 0x55c6 y pegarle si toca
+L 0x55c9 anda  Lee el mando -o la maquina- y adelanta al jugador
+C 0x55cc el bit 0 marca al jugador que esta parado
+C 0x55d0 con dos jugadores, el segundo lo lleva la maquina
+C 0x55d6 se le quitan los bits de direccion
+C 0x55d9 y aqui se decide quien manda sobre este
+C 0x55de 0xE0A8 congela a todos mientras dura una jugada
+C 0x55e3 el byte 7 de la ficha trae lo que se ha pedido
+C 0x55e6 los cuatro bits de abajo son la direccion
+C 0x55e8 si no hay direccion, no anda
+C 0x55e9 y 0x0F es la combinacion imposible
+C 0x55ef 0xE060 congela la pista durante un aviso
+C 0x55fd calcula el paso
+C 0x5601 y le limpia los bits de cara
+L 0x560f solo_direccion  Se queda con los dos bits que dicen izquierda o derecha
+L 0x5613 paso_lateral  Mueve al jugador un pixel a un lado y le pone la cara
+C 0x5614 sin direccion no hay paso
+C 0x5615 a la derecha, uno mas
+C 0x5617 y mirando a la derecha
+C 0x5619 el otro bit es el otro lado
+C 0x561c mirando a la izquierda
+C 0x561e y un pixel menos
+C 0x5620 conserva el estado y le pone la cara
+C 0x562a la posicion nueva
+C 0x562e el byte 6 de la ficha trae los topes por donde no puede pasar
+C 0x5638 si es humano, se le deja mas sitio
+C 0x5643 la mitad de la pista decide el limite
+C 0x564d 0x50 es la altura de la red
+C 0x565a 0x68 y 0x79 son dos columnas donde no se puede estar
+C 0x5666 y estos otros dos topes van segun de que lado este
+C 0x5677 si se sale por un lado, no se mueve
+C 0x567a ni por el otro
+C 0x567d en dobles hay que mirar tambien a la pareja
+C 0x5688 el companero puede estar delante o detras
+C 0x5694 saca su posicion de la ficha del otro
+C 0x56af comprueba si chocan
+C 0x56b7 y si chocan, no se mueve
+C 0x56b8 el bit 2 marca que este cuadro se ha movido
+C 0x56bc guarda la posicion nueva
+C 0x56c6 0xE0B8 es la pelota, que se arrastra con el jugador que la lleva
+C 0x56cc y 0xE0BC su sombra
+L 0x56d3 pasa_de_cuadro  Alterna la pierna cada pocos cuadros, para que ande
+C 0x56d6 el jugador parado no anima
+C 0x56da si esta mirando a un lado, siempre anima
+C 0x56de y si se movio en este cuadro, tambien
+C 0x56e2 si no, uno de cada ocho cuadros
+C 0x56f0 y el bit 0 del byte 4 va cambiando: una pierna y la otra
+L 0x56fa elige_el_dibujo  Compone el numero de postura con lo que el jugador esta haciendo
+C 0x56fd el parado no cambia de dibujo
+C 0x5701 los dos bits de la cara
+C 0x5708 el byte 4 es el numero de postura
+C 0x570a se conservan los tres bits de arriba
+C 0x570e y se le meten los que dicen que esta andando
+C 0x5716 mirando a un lado
+C 0x5718 y si son los dos bits, mirando de frente
+C 0x571f el bit 0 es la pierna
+C 0x5725 y a la ficha
+L 0x5727 golpea  Prepara el golpe cuando el jugador aprieta el boton
+C 0x5727 0xE060 congela durante un aviso
+C 0x572d 0xE0A8 dice que hay una jugada en marcha
+C 0x5735 el parado esta en medio de un golpe
+C 0x5739 los cuatro bits de arriba del byte 7 son el disparo
+C 0x5740 sin disparo, se le quita la marca
+C 0x5743 y si ya estaba golpeando, no se repite
+C 0x5746 el bit 7 del byte 12 se apaga al empezar el golpe
+C 0x574d deja el estado en 7: golpeando
+C 0x5753 el byte 3 es la columna del jugador
+C 0x5754 0xE0B8 es donde esta la pelota
+C 0x5757 0x50 y 0xA0 parten la pista en tres
+C 0x5762 golpe corto: dos cuadros y catorce de fuerza
+C 0x5769 golpe largo: ocho cuadros y veinte de fuerza
+C 0x576e y el bit de la direccion del golpe
+C 0x577a el bit 3 marca al que saca
+C 0x577f otra vez, humano o maquina
+C 0x5786 la maquina tarda ocho cuadros en soltar
+C 0x5789 y le sale con mas o menos angulo
+C 0x578e segun de que lado de la red este
+C 0x5795 el bit 2: ya ha golpeado
+C 0x5798 y el angulo se mete en el byte que toca
+L 0x579e cuenta_atras_del_golpe  Va gastando los cuadros que dura el golpe
+C 0x579f un cuadro menos
+C 0x57a2 los cuatro ultimos son los del impacto
+C 0x57a6 y el dibujo avanza con ellos
+L 0x57aa acaba_el_golpe  Devuelve al jugador a su postura de espera
+C 0x57aa apaga el bit 7 del byte 12
+C 0x57b0 le quita los bits del golpe
+C 0x57b4 diez cuadros de descanso
+C 0x57ba y le deja la postura limpia
+L 0x57be reparte_las_fichas  Copia las cuatro fichas de salida a la RAM
+C 0x57be la primera ficha va a 0xE100
+C 0x57c1 y las cuatro salen de la tabla de 0x57EB
+C 0x57c4 cuatro jugadores
+C 0x57c7 41 bytes cada uno
+C 0x57cc la siguiente ficha empieza en la decena redonda de despues
+C 0x57d5 si no son dobles, sobran dos jugadores
+C 0x57da asi que el tercero se copia encima del segundo
+C 0x57e8 y al segundo se le pone el estado 4
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x678d decide_el_rival  Elige a que jugador le toca ir a por la pelota y con que golpe
+C 0x678d 0xE0A8 dice que hay una jugada viva
+C 0x6792 0xE0A9 cuenta los botes: al segundo, ya no hay nada que hacer
+C 0x6798 0xE044 congela la decision mientras haya un aviso
+C 0x679d antes del primer bote, todos quietos
+C 0x67a3 0xE043 avisa de que la pelota viene hacia este lado
+C 0x67a8 el jugador de abajo
+C 0x67ab y el de arriba
+C 0x67ae con dos jugadores, la pareja es la otra ficha
+C 0x67b5 0xE0D7 dice hacia donde va la pelota
+C 0x67bb y con eso se elige campo
+C 0x67bc el byte 4 de la ficha, con los bits de arriba
+C 0x67c5 primero el que esta mas cerca
+C 0x67c9 en dobles, tambien decide el companero
+C 0x67cd si ya esta golpeando, no se le manda otra cosa
+C 0x67d2 0x30 es lo que ocupa una ficha
+L 0x67d9 manda_a_por_la_pelota  Le dice a un jugador que vaya y con que golpe
+C 0x67da IX es la ficha de este
+C 0x67dc el bit 7 del byte 12: ya esta a lo suyo
+C 0x67e1 humano o maquina
+C 0x67e6 0xE042 dice de quien es el punto
+C 0x67ec y si aun no ha botado, se espera
+C 0x67f1 0xE0C0 marca la pelota rodando por el suelo
+C 0x67f6 en dobles hay una comprobacion mas
+C 0x67fb el bit 4 dice que ese ya va
+C 0x67ff el bit 0 separa al que juega del que mira
+C 0x6803 saca la posicion de la pelota
+C 0x6806 el bit 3 es el que saca
+C 0x680a con el saque se acerca poco
+C 0x680e y si no, dieciseis mas
+C 0x6817 el bit 5 cambia el modo de acercarse
+C 0x681e mira si ya la alcanza
+C 0x6822 si no llega, se acabo por este cuadro
+C 0x6823 el bit 5 del estado
+C 0x6829 0xE200 lleva las banderas del partido
+L 0x682f busca_la_franja  Parte la pista en cuatro franjas y coloca al jugador en la suya
+C 0x6834 el byte 4 es la postura
+C 0x6836 las cuatro franjas, con su ancho y su centro
+C 0x683d los cinco bits de abajo de la postura
+C 0x683f la primera franja llega hasta 8
+C 0x6848 la segunda hasta 14
+C 0x6851 la tercera hasta 20
+C 0x6855 y la cuarta el resto
+C 0x685e si ya esta en el centro de su franja, no se mueve
+C 0x6861 y si no, se acerca
+L 0x6866 elige_la_fuerza  Segun donde este la pelota, con cuanta fuerza le da
+C 0x6866 el bit 5 lleva a la version corta
+C 0x686c humano o maquina, otra vez
+C 0x6873 seis y cinco de fuerza
+C 0x6878 0x70 parte la pista por la mitad
+C 0x687c y en la otra mitad, uno y cero
+C 0x6880 0xE042 dice de quien es el punto
+C 0x6889 0x43 y 0xA0 son las dos rayas de fondo
+C 0x6893 y aqui se mira a la pareja
+C 0x6897 0x5D bytes mas atras esta su posicion
+C 0x68a4 el bit 7 dice si la diferencia es negativa
+C 0x68a8 y en ese caso se le da la vuelta
+C 0x68ad tres escalones: 0x20 y 0x40
+C 0x68b8 y se suma el paso tantas veces como escalones
+C 0x68c0 con la postura por debajo de 8, un paso mas
+L 0x68cc iguala  Acerca dos valores de uno en uno hasta que coinciden
+L 0x68d2 elige_el_efecto  Saca de la tabla el efecto segun donde va a caer
+C 0x68d4 los umbrales estan en 0x6AC3
+C 0x68d8 el byte 2 es la fila del jugador
+C 0x68db 0x50 es la red
+C 0x68df y del otro lado se usan los otros cuatro umbrales
+C 0x68e5 siete es el efecto mas fuerte
+C 0x68e7 y va bajando segun se pasa cada umbral
+C 0x68f0 0x70 es la mitad de la pista
+C 0x68f4 aqui empieza la otra escala
+C 0x68ff ocho, el otro extremo
+C 0x6901 al humano se le rebaja dos
+C 0x6905 pero solo si lo lleva la maquina
+L 0x690b clase_de_golpe  Deja en 0xE0D6 que golpe toca, mirando la altura de la pelota
+C 0x690c 0xE0D6 es lo que luego lee 0x5492
+C 0x690f 0xE0BB es la sombra
+C 0x6913 y 0xE0B7 la pelota
+C 0x6916 0xA0 es el fondo de la pista
+C 0x691f golpe 4: el de arriba del todo
+C 0x6924 la altura es la resta de las dos
+C 0x6925 golpe 2 por omision
+C 0x692c el bit 3 es el saque, que va aparte
+C 0x6932 pelota baja, golpe 0
+C 0x6934 hasta seis de alto
+C 0x6939 golpe 1 hasta trece
+C 0x693d 0xE0DA es la opcion de partido elegida
+C 0x6944 golpe 6 en la mas dificil
+C 0x6946 y por encima de 0x20 no se llega
+C 0x694c golpe 3 para el humano
+C 0x694e entre catorce y cuarenta
+C 0x6956 y a partir de 0x1F, golpe 5
+L 0x695e saca  El saque tiene sus propias alturas
+C 0x695f la altura a la que esta la pelota
+C 0x6962 veinte de margen
+C 0x6964 0x60 parte el saque en dos
+C 0x6968 y arriba, treinta y dos
+C 0x696e otra vez la sombra
+C 0x6976 y la altura
+C 0x6978 ocho de margen por abajo
+C 0x697a en la opcion 3 y con dos jugadores
+C 0x6986 0xE032 y 0xE033 son los tanteos de los dos
+C 0x6989 con seis puntos, el margen se va a cero
+C 0x699a por debajo de 0x16 la sombra se recoloca
+C 0x69a0 restandole 0x16
+C 0x69a6 y por encima de 0x19, 0x18
+L 0x69b0 parametros_del_efecto  Copia de la tabla los cuatro valores del golpe elegido
+C 0x69b0 E trae la clase de golpe
+C 0x69b2 cuatro bytes por entrada
+C 0x69b4 la tabla vive en 0x6AA7
+C 0x69ba y van a 0xE0AA, salteados de dos en dos
+C 0x69bd cuatro valores
+C 0x69c6 el humano no lleva correccion
+C 0x69ce 0x90 es la ficha del cuarto jugador
+C 0x69d5 0xE0B7 es la pelota
+C 0x69d8 entre 0x40 y 0xA0 esta el centro de la pista
+C 0x69f0 el bit 3 es el saque, que no se corrige
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x69e0 y de ahi salen las correcciones de punteria
+C 0x6a02 0xE0B7 otra vez, para la correccion de altura
+C 0x6a0a por debajo de 0x28 la pelota va muy baja
+C 0x6a12 y se le rebaja el efecto veinte
+C 0x6a16 el bit 5 dice de que lado sale
+C 0x6a1d con dos jugadores hay una vuelta mas
+C 0x6a23 0x30 es la ficha del segundo
+C 0x6a2a 0xE045 corta el vuelo mientras se recalcula
+C 0x6a2d y 0xE0DB pide la trayectoria nueva
+C 0x6a31 0xE204 lleva la cuenta de golpes seguidos
+C 0x6a39 a partir de ocho, solo cuenta la paridad
+C 0x6a3d 0xE200 son las banderas del punto
+C 0x6a46 el bit 7 del byte 12: este ya ha golpeado
+C 0x6a4c el sonido de la raqueta
+C 0x6a52 0x15 es el efecto que no lleva sonido extra
+C 0x6a58 y si no, suena tambien el segundo
+C 0x6a62 el byte 3 es la columna del que golpea
+C 0x6a65 0x58 y 0x88 son las dos posiciones de saque
+C 0x6a6d y 0x86 la altura del saque bueno
+C 0x6a79 el bit 6 de las banderas marca el saque valido
+C 0x6a7f 0xE0C0 a cero: la pelota deja de rodar
+C 0x6a85 0xE043 a cero: ya no viene hacia aqui
+C 0x6a88 y 0xE0A9 reinicia la cuenta de botes
+C 0x6a8e humano o maquina
+C 0x6a94 0xE042 a cero: el punto vuelve a estar abierto
+C 0x6a97 0xE20A cuenta los golpes del humano
+C 0x6a9e y se recalcula la trayectoria
+C 0x6aa1 el byte 12 del rival sube uno
+L 0x6acb hay_contacto  Dice si dos cosas se tocan, comparando la distancia con un rectangulo
+C 0x6acb los rectangulos estan en 0x6B09
+C 0x6acf cuatro bytes por entrada
+C 0x6ad4 la distancia en un eje
+C 0x6ad7 se prueba contra los dos primeros
+C 0x6adb si ese eje ya no encaja, no hay contacto
+C 0x6adc y ahora los otros dos bytes
+C 0x6ade la distancia en el otro eje
+L 0x6ae0 dentro_del_margen  Comprueba que un valor cae entre dos limites, con signo
+C 0x6ae0 si la resta salio negativa, va por el otro camino
+C 0x6ae3 el bit 7 dice que el limite es negativo
+C 0x6ae7 por arriba
+C 0x6aed y por abajo
+C 0x6af0 dentro: acarreo puesto
+C 0x6af2 y fuera: acarreo limpio
+L 0x6af4 margen_negativo  El mismo rango, cuando la distancia salio del otro lado
+C 0x6af4 con el limite positivo no hay nada que hacer
+C 0x6af9 y aqui los dos son negativos
+C 0x6afe se comparan al reves
+C 0x6b01 el de arriba
+C 0x6b05 y el de abajo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x588f lo_lleva_la_maquina  El bit 0 del byte 12 de la ficha separa al humano del rival
+L 0x5894 hay_dos_jugadores  Compara 0xE00E con 2
+L 0x589a hay_dobles  Compara 0xE00E con 3
+L 0x58a0 mueve_y_dibuja  Coloca la figura y le pone sus cinco sprites
+L 0x58a9 carga_la_postura  Descomprime en la VRAM los cinco sprites de la postura
+C 0x58aa IX es la ficha
+C 0x58ac los bytes 0x25 y 0x26 dicen a que parte de la VRAM van
+C 0x58b2 el byte 4 es el numero de postura
+C 0x58b5 dos bytes por entrada de la tabla
+C 0x58b6 y de ahi sale la descripcion de doce bytes
+C 0x58b9 CINCO sprites: una figura son cinco capas
+C 0x58bd cada puntero apunta a un patron comprimido
+C 0x58c1 32 bytes por capa
+C 0x58c4 la siguiente capa va 32 bytes mas alla en la VRAM
+C 0x58ca y el puntero siguiente, dos bytes mas alla
+C 0x58cf el bit 2 se apaga: ya esta cargada
+L 0x58d4 coloca_los_sprites  Suma la posicion del jugador a las cinco parejas (y,x)
+C 0x58d7 el byte 4 otra vez, la postura
+C 0x58db la misma descripcion de doce bytes
+C 0x58de y se salta los cinco punteros para llegar al sexto
+C 0x58e3 que apunta a las cinco parejas
+C 0x58e9 los atributos empiezan en el byte 0x10 de la ficha
+C 0x58ef cinco sprites
+C 0x58f2 los bytes 2 y 3 son la fila y la columna del jugador
+C 0x58fa la y de la pareja
+C 0x58fb un 0xCF la esconde, y entonces no se le suma nada
+C 0x58ff y si no, se le suma la del jugador
+C 0x5904 y lo mismo con la x
+C 0x5909 cuatro bytes por sprite: y, x, patron y color
+C 0x590f los bytes 0x27 y 0x28 dicen donde van los atributos
+C 0x5918 los veinte bytes empiezan en el 0x10
+C 0x5920 cinco sprites
+C 0x5926 de cuatro bytes cada uno
+L 0x5932 descomprime_sprite  Deja en la VRAM los 32 bytes de un sprite de 16x16
+C 0x5934 coloca el puntero de escritura
+C 0x5937 el puerto de datos del VDP
+C 0x593b 32 bytes, siempre
+C 0x593d un cero es la orden de repetir
+C 0x5941 el inc compensa el dec de la vuelta
+C 0x5943 cuantos ceros; un 0 aqui vale 256
+C 0x5947 si se llega al final, se acabo
+C 0x594e y si no era cero, el byte va tal cual
+L 0x5956 busca_en_tabla  HL = la palabra que hay en la tabla, indexada por A
+L 0x6b25 juega_la_maquina  Le pone al rival la pulsacion que le tocaria a un humano
+C 0x6b25 con un solo jugador no hay nada de esto
+C 0x6b29 0xE060 congela durante un aviso
+C 0x6b2e primero mira si ya puede golpear
+C 0x6b31 0xE160 es el jugador de arriba
+C 0x6b35 y 0xE100 el de abajo, que es su referencia
+C 0x6b39 0xE200 son sus banderas
+C 0x6b3f en dobles hay una pareja mas
+C 0x6b43 0xE190
+L 0x6b4e busca_el_destino  Decide a que punto de la pista tiene que ir el rival
+C 0x6b4f el bit 0 de las banderas: ya tiene destino
+C 0x6b52 0x6A y 0x08 son el punto de espera
+C 0x6b56 en dobles se reparten la pista
+C 0x6b5b el bit 4 dice que este va a por la pelota
+C 0x6b61 y el companero se queda mas atras
+C 0x6b64 el bit 2 se limpia en cada decision
+C 0x6b6b 0xE0D7 dice hacia donde va la pelota
+C 0x6b6f si viene de frente, se espera
+C 0x6b71 se limpian los bits de movimiento
+C 0x6b7f el byte 3 de las banderas es una cuenta atras
+C 0x6b81 hasta que llega a cero no se decide otra vez
+C 0x6b86 y entonces se recarga girando el byte siguiente
+C 0x6b90 0xE0DE es donde va a caer la pelota
+C 0x6b94 0x50 es la altura a la que se coloca
+C 0x6b9b el bit 4 otra vez: quien va a por ella
+C 0x6ba3 0xE042 dice de quien es el punto
+C 0x6ba9 0xE0DD es la columna donde cae
+C 0x6bac por encima de 0xC0 se planta arriba del todo
+C 0x6bb4 y por debajo de 0x42, se queda donde esta
+C 0x6bb8 0xD5 es la fila de la red vista desde arriba
+C 0x6bba 0xE0DC trae la caida ya calculada
+C 0x6bc0 sin pasarse de 0xA0
+C 0x6bc8 y diez menos, para llegar con margen
+C 0x6bd0 deja el bit 3: ya tiene a donde ir
+L 0x6bd8 apunta_al_destino  Guarda cuanto le falta al rival para llegar, con su pizca de fallo
+C 0x6bd8 el byte 2 es su fila
+C 0x6bdb lo que le falta en ese eje
+C 0x6bdf y el byte 3 su columna
+C 0x6be4 al humano no se le pone fallo
+C 0x6be9 el registro de refresco de la memoria, que el Z80 mueve solo:
+C 0x6beb es de donde sale el temblor de la punteria del rival
+C 0x6bee 0xE000 es el contador de cuadros
+C 0x6bf1 y en la mitad de los cuadros no falla nada
+L 0x6bfb pulsa_por_el  Convierte la distancia que falta en direcciones de mando
+C 0x6bfb el bit 0: este esta parado
+C 0x6c04 los tres bits de la distancia
+C 0x6c0a el eje de las filas
+C 0x6c10 y el de las columnas
+C 0x6c16 si no falta nada por ninguno, ya esta colocado
+C 0x6c1b el bit 1 es el que ya llego
+C 0x6c20 0xE0A9 lleva la cuenta de botes
+C 0x6c28 se le limpian los bits de direccion
+C 0x6c30 y el bit 0 marca que este se planta
+C 0x6c32 el byte 6 guarda lo que se pidio el cuadro anterior
+C 0x6c3b el bit 4 es el disparo
+C 0x6c41 y todo junto va al byte 7, que es el que lee 0x55C9
+L 0x6c45 acerca_un_paso  Da un paso hacia el destino por un eje, y devuelve si ya llego
+C 0x6c48 0xE060 congela durante un aviso
+C 0x6c4f al humano se le dejan mas bits
+C 0x6c58 y a la maquina, siete
+C 0x6c5a si no falta nada, no hay paso
+C 0x6c5e el bit 7 dice hacia que lado
+C 0x6c62 uno menos
+C 0x6c64 o uno mas, y con el paso a la mitad
+L 0x6c68 puede_golpear  Mira si el rival tiene la pelota al alcance de la raqueta
+C 0x6c68 0xE160, el de arriba
+C 0x6c71 en dobles, tambien el companero
+C 0x6c75 0xE190
+L 0x6c7b prueba_el_alcance  Compara la pelota con la raqueta y enciende el bit 4
+C 0x6c7b 0xE0D7: si la pelota va hacia el otro lado, no hay nada que hacer
+C 0x6c84 la posicion de la pelota
+C 0x6c89 el bit 2 amplia el alcance
+C 0x6c91 rectangulo 1 o rectangulo 5
+C 0x6c97 fuera de alcance: bit 4 apagado
+C 0x6c9a y dentro: encendido
+C 0x6ca0 0xE0A8 dice si la jugada esta viva
+C 0x6ca6 con la jugada parada, el rival no se lanza
+C 0x6cb1 y con ella viva, uno de cada pocos cuadros
+C 0x6cb5 la sombra
+C 0x6cb9 y la pelota: su resta es la altura
+C 0x6cbd entre 0x18 y 0x28 de alto es la banda buena para pegarle
+L 0x6cc6 mira_a_la_pareja  Compara las dos fichas de un bando para no estorbarse
+C 0x6cc6 el de abajo
+C 0x6cc9 y el de arriba
+C 0x6ccc el byte 8
+C 0x6cce 0xE0D7 elige que bando se mira
+C 0x6cd4 0xE160
+C 0x6cd8 con dos jugadores, la otra ficha es 0xE130
+C 0x6ce1 el byte 4 con los bits de arriba
+C 0x6cee en dobles hay una pareja mas
+L 0x6cf7 estan_juntos  Enciende el bit 3 si los dos estan a menos de diez
+C 0x6cfa el byte 2 del primero
+C 0x6cfc y el mismo byte del otro
+C 0x6d00 la distancia entre los dos
+C 0x6d01 en valor absoluto
+C 0x6d07 al parado no se le toca
+C 0x6d0a el bit 3 se apaga
+C 0x6d0c y solo se enciende si estan a menos de diez
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6d12 cambia_de_lado  En dobles, los dos de cada bando se intercambian el sitio
+C 0x6d12 esto solo pasa en dobles
+C 0x6d16 el byte 0x27 de la primera pareja
+C 0x6d19 y el de la segunda
+C 0x6d1f la otra pareja
+L 0x6d25 intercambia_puestos  Cambia el destino de VRAM de dos jugadores y los redibuja
+C 0x6d25 se guarda el de uno
+C 0x6d27 se le pone el del otro
+C 0x6d2a y al otro el del primero
+L 0x6d30 redibuja_ficha  Retrocede al principio de la ficha y le vuelca los atributos
+C 0x6d31 0x27 bytes atras esta el principio
+L 0x6d3a prepara_el_saque  Decide quien saca, de que lado, y recoloca a todos
+C 0x6d3d en individuales el turno alterna entre dos
+C 0x6d41 y en dobles, entre cuatro
+C 0x6d43 0xE042 dice si el punto ya esta cerrado
+C 0x6d47 al empezar, saca el cuarto
+C 0x6d4b 0xE050 lleva de quien es el saque
+C 0x6d54 y va rotando
+C 0x6d57 con dos jugadores, uno menos
+C 0x6d67 0xE0DC en adelante, las cuatro fichas
+C 0x6d6a cuatro jugadores
+C 0x6d6d 0x24 bytes hasta el byte de estado
+C 0x6d73 se le deja el estado en 4: esperando
+C 0x6d79 diez cuadros de espera
+C 0x6d7f y la postura limpia
+C 0x6d82 ocho bytes mas alla
+C 0x6d89 al que le toca sacar se le pone a uno
+C 0x6d91 el principio de su ficha
+C 0x6d94 0x80 es el bit de un lado
+C 0x6d99 y el bit 7 del byte 2 elige entre los dos
+C 0x6d9e 0x40 es el otro
+C 0x6da5 y vuelta con el siguiente jugador
+C 0x6da8 0xE20A a cero: empieza a contarse el peloteo
+C 0x6dab si el punto no estaba cerrado, aqui se acaba
+C 0x6db1 0xE200 y 0xE205 son las banderas de los dos bandos
+C 0x6db7 el byte 12 del tercero dice quien lleva la iniciativa
+C 0x6dbf al que saca se le pone el bit 3
+C 0x6dc2 y al otro se le limpia
+C 0x6dcb dieciseis cuadros de cuenta atras a los dos
+C 0x6dd2 0xE0E2 a cero
+C 0x6dd5 lo de abajo es solo de dobles
+C 0x6dd9 el bit 1 del turno
+C 0x6de0 los dos del bando de abajo
+C 0x6de6 se mira cual esta mas adelantado
+C 0x6de9 y se reparten los papeles segun eso
+C 0x6df2 0xE190 y 0xE160, los de arriba
+L 0x6e01 quien_esta_delante  Compara el byte 2 de dos fichas
+C 0x6e05 el de la primera
+C 0x6e06 y el de la segunda
+L 0x6e09 reparte_papeles  Marca cual de los dos es el de red y cual el de fondo
+C 0x6e0f al primero se le pone el bit que le toque
+C 0x6e14 y al segundo el contrario
+C 0x6e19 invirtiendo el bit 4
+L 0x6e1f posturas_de_dobles  Deja a la pareja de arriba mirando como toca
+C 0x6e1f solo en dobles
+C 0x6e23 0xE050 dice de quien es el saque
+C 0x6e26 los dos estados posibles
+C 0x6e2f y segun el turno se intercambian
+C 0x6e33 0xE160
+C 0x6e37 y 0xE190
+L 0x6e3b pon_la_dificultad  La dificultad sube con lo que dura el peloteo
+C 0x6e3b 0xE0DA es la opcion elegida en el GAME SELECT
+C 0x6e3f dos bytes por entrada
+C 0x6e41 y la tabla de 0x6E61 tiene una curva por opcion
+C 0x6e47 cinco de base
+C 0x6e4a 0xE20A cuenta los golpes que lleva el peloteo
+C 0x6e4d de dos en dos
+C 0x6e4f y a partir del golpe treinta ya no sube mas
+C 0x6e55 se busca en la curva
+C 0x6e5a 0xE204 y 0xE209 son la dificultad de cada bando
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6e97 rota_las_parejas  Cambia de sitio a los cuatro jugadores entre puntos
+C 0x6e9c 0xE160
+C 0x6e9f y 0xE100
+C 0x6ea2 copia dieciseis bytes de una ficha a la otra
+C 0x6eaf el byte 0x27 dice a que sprites va cada uno
+C 0x6eb5 y esos si se intercambian, no se copian
+L 0x6ec2 copia_media_ficha  Los primeros dieciseis bytes de una ficha a otra
+L 0x6ec8 posicion_de_la_pelota  Devuelve en DE el destino y en BC donde esta ahora
+C 0x6eca los bytes 2 y 3 de la ficha
+C 0x6ecd 0xE0B7 y 0xE0B8, la pelota
+L 0x6ed2 mira_el_juez  El juez de silla sigue la pelota con los ojos
+C 0x6ed2 0xE0B7 es donde esta la pelota
+C 0x6ed5 B sera cual de las tres caras toca
+C 0x6ed7 0x48 y 0x78 parten la pista en tres franjas
+C 0x6ee1 la cara ocupa 2x2 tiles: arriba en la VRAM 0x3904
+C 0x6ee7 y las tres caras estan en la tabla de 0x715D
+C 0x6eeb cuatro tiles por cara
+C 0x6ef0 los dos de arriba
+C 0x6ef5 y los dos de abajo, en 0x3924
+C 0x6efd que son los otros dos
+L 0x6f00 arbitra  Decide si el punto sigue, y quien lo gana
+C 0x6f00 0xE045 congela mientras hay un aviso
+C 0x6f07 0xE0D8 dice si hay pelota en juego
+C 0x6f0e 0xE0A8 dice si la jugada esta viva
+C 0x6f14 con la jugada parada, solo se repinta
+C 0x6f17 0xE0C3 lleva de quien es el saque que viene
+C 0x6f1f 0xE051 y 0xE050 llevan el turno
+C 0x6f22 0xE00E, cuantos jugadores hay
+C 0x6f2b el bit 0 dice de que lado se saca
+C 0x6f33 0xE107 es el byte 7 del primer jugador
+C 0x6f3e 0xE167, el del tercero
+C 0x6f46 0xE137, el del segundo
+C 0x6f4d y 0xE197 el del cuarto
+C 0x6f4f 0xE05B se queda con la ficha del que saca
+C 0x6f52 el bit 4 es el disparo: aqui es donde saca
+C 0x6f57 siete bytes atras esta el byte de estado
+C 0x6f5a y se le pone el bit 1: sacando
+C 0x6f5d 0xE05D a cero
+C 0x6f61 0xE0DB pide la trayectoria nueva
+C 0x6f64 0xE0A8 a uno: la jugada arranca
+C 0x6f67 y 0xE0D7 se invierte: la pelota cambia de sentido
+L 0x6f70 saque_de_dos  Con dos jugadores el turno es mas simple
+C 0x6f71 el bit 0 del turno
+C 0x6f73 0xE107
+L 0x6f7f la_pelota_en_el_aire  Mira si el saque llega o se queda corto
+C 0x6f7f uno de cada dos cuadros
+C 0x6f85 0xE05D marca el saque ya resuelto
+C 0x6f8b 0xE0BB, la sombra
+C 0x6f8e por encima de 0xB0 se le da la vuelta
+C 0x6f95 y 0xE0B7 la pelota, con diez de margen
+C 0x6f9d 0x60 parte la pista
+C 0x6f9f la altura a la que se queda
+C 0x6fa5 y se le baja la sombra
+C 0x6fac 0xE0A8 a cero: la jugada se para
+C 0x6faf 0xE05B, la ficha del que sacaba
+C 0x6fb2 siete bytes atras
+C 0x6fb6 el bit 0 dice si el saque valia
+L 0x6fc4 pasa_la_red  Comprueba si la pelota pasa la red o se la come
+C 0x6fc7 el bit 0 de 0xE0D8: no hay pelota
+C 0x6fca 0xE0D7 dice hacia donde va
+C 0x6fd0 0xE04F es el saque
+C 0x6fd6 0xE0B7 otra vez
+C 0x6fd9 por debajo de 0x18 ya esta en el fondo
+C 0x6fdd y se marca
+C 0x6fe1 el sonido del bote
+L 0x6fe7 toca_la_red  Mira si la pelota se queda en la red y con que angulo llega
+C 0x6fe7 0xE04C marca la red ya tocada
+C 0x6fed 0xE0B7
+C 0x6ff0 0x6C es donde esta la red
+C 0x6ff5 0x70 menos la altura da lo que le falta
+C 0x6ff8 0xE0D0 monta la cuenta
+C 0x7003 0xAA es la pendiente con la que se compara
+C 0x7005 y se multiplica
+C 0x7008 0xE0D1 trae el resultado
+C 0x700b 0xE0B8, la columna de la pelota
+C 0x7011 en valor absoluto
+C 0x7014 si no llega, pasa de largo
+C 0x7016 0xE0AC se parte por la mitad: la pelota pierde fuerza
+C 0x701a y 0xE0D6 se queda con el golpe de red
+C 0x7024 0xE04C: la red ya esta contada
+C 0x7027 y se recargan los parametros del golpe
+L 0x702a bota_en_el_suelo  Comprueba el bote, y de que lado de la raya cae
+C 0x702a 0xE044 congela durante un aviso
+C 0x702f 0xE0C4 marca el bote ya contado
+C 0x7034 0xE0B8, la columna
+C 0x7037 entre 0x30 y 0xD0 esta la pista
+C 0x703d 0xE0BB y 0xE0B7, la sombra y la pelota
+C 0x7044 entre 0x60 y 0x66 esta la banda de la red
+C 0x704a la altura otra vez
+C 0x704b y con menos de dieciseis, roza
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x7050 el bit 0 de 0xE0C4: el bote ya esta contado
+C 0x7053 0xE0AC pierde la mitad en cada bote
+C 0x705a con menos de quince ya casi no rebota
+C 0x705e 0xE0DB pide recalcular la trayectoria
+C 0x7063 el rebote corto
+C 0x7069 0xE04F es el saque
+C 0x7070 0xE044 congela mientras se resuelve
+C 0x7075 0xE0C0 marca la pelota rodando
+C 0x7079 y 0xE0D7 se invierte: el rebote cambia de sentido
+C 0x707e el rebote largo
+C 0x7086 y suena el bote
+L 0x708c bota_dentro_o_fuera  Mira la casilla donde cayo y decide si la pelota es buena
+C 0x708c 0xE044 congela durante un aviso
+C 0x7091 0xE04D marca el bote ya juzgado
+C 0x7097 esto solo se hace en el primer bote
+C 0x709c y se apunta para no repetirlo
+C 0x709e 0xE0B7, donde cayo
+C 0x70a1 0xE042 dice si el punto ya esta cerrado
+C 0x70a9 0xE051 y 0xE050 llevan el turno de saque
+C 0x70b9 0xE00E, cuantos jugadores hay
+C 0x70c2 0xE052 son los limites que se copiaron al empezar
+C 0x70c9 0x60 parte la pista por la red
+C 0x70ce el pasillo de saque de este lado va de 0x3D a 0x63
+C 0x70d5 y ahora el otro eje
+C 0x70d6 0x80 lo parte por la mitad
+C 0x70db el lateral de un lado, de 0x4F a 0x7C
+C 0x70e1 0xE043: la pelota es buena y viene hacia aca
+C 0x70e7 y el del otro, de 0x7A a 0xAA
+C 0x70ef el otro medio campo, hasta 0x85
+C 0x70f2 y desde 0x63
+C 0x70ff los limites de ese lado, de 0x47 a 0x7C
+C 0x7104 y los del otro, de 0x7A a 0xB1
+L 0x710c bota_en_el_saque  El saque tiene su propio cuadro, y va en diagonal
+C 0x710d la posicion de la pelota
+C 0x710e por encima de 0xAA se sale por el fondo
+C 0x7111 y por debajo de 0x25, por el otro
+C 0x7114 lo que le falta hasta el fondo
+C 0x7118 0xE0D0 monta la multiplicacion
+C 0x7123 0x28 es la pendiente del pasillo de saque
+C 0x7125 y 0x3D donde empieza
+C 0x7127 0xE051 dice de que lado se saca
+C 0x712d del otro lado, otra pendiente y otro origen
+C 0x7131 y se hace la cuenta
+C 0x7136 0xE0D1 trae el resultado
+C 0x713a si se pasa de la raya, el saque es malo
+C 0x713e diez de margen por el otro lado
+C 0x7142 0xE052, el limite guardado
+C 0x7147 0xE045 lleva la cuenta de saques
+C 0x714e 0xE0B7 otra vez
+C 0x7153 y 0x63 es la mitad de la pista
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x7169 vuelca_tiles  Suelta B bytes al puerto de datos del VDP con outi
+C 0x7169 el puerto de escritura
+C 0x716d el nop da al VDP el respiro que necesita entre bytes
+C 0x716e outi escribe, avanza y descuenta, todo en una
+L 0x7173 arranca_el_punto  Coloca a todos, saca, y no vuelve hasta que el punto acaba
+C 0x7174 0xE0B7 y 0xE0E0 arrancan en 0x20
+C 0x717c los puestos de individuales
+C 0x717f y en dobles, los otros
+C 0x718a la tabla de 0x771F
+C 0x718d 0xE051 a cero: primer saque
+C 0x7190 0xE002 dice que el jugador eligio en el menu
+C 0x7196 0xE00E se queda con cuantos jugadores hay
+C 0x719d y 0xE0DA con la opcion de partido
+C 0x71a0 con la demostracion se usan otros puestos
+L 0x71a3 coloca_a_todos  Copia los ocho bytes de puestos a las cuatro fichas
+C 0x71a3 0xE052 recibe los ocho
+C 0x71a6 dos por jugador
+C 0x71ad cuatro jugadores
+C 0x71af 0xE102, la fila del primero
+C 0x71b3 la fila
+C 0x71b7 y la columna
+C 0x71b9 0x2F bytes hasta la ficha siguiente
+C 0x71c0 pinta el marcador
+C 0x71c3 y los rotulos del partido
+C 0x71c6 0xE049 dice si hay que recolocar
+C 0x71cd 0xE0E2 y 0xE04E cortan la recolocacion
+C 0x71d9 0xE051, de que lado toca sacar
+C 0x71df 0xE053 y 0xE057 son las columnas de los dos
+C 0x71e5 0xE00E otra vez
+C 0x71eb con dos jugadores, la otra ficha
+C 0x71ee se les da la vuelta y se les resta 0x20
+C 0x71fb 0xE050, el turno
+C 0x71ff 0xE052 y 0xE057
+C 0x720a dos jugadores por bando
+C 0x720d el mismo giro
+C 0x7216 y los dos de un bando se intercambian la columna
+L 0x721e resuelve_el_punto  Suena el aviso, espera a que la pelota se pare y reparte
+C 0x721e 0xE043 dice si la pelota entro
+C 0x7224 0xE0C0 marca la pelota rodando
+C 0x722a 0xE05A es la musica que toca
+C 0x7230 pinta el tanteo nuevo
+C 0x7233 orden 1 a la interrupcion
+C 0x7238 y otra vez los rotulos
+C 0x723b 0xE0D8: no se sigue hasta que la pelota se para
+C 0x7242 0xE003 a cero: la partida se detiene un momento
+C 0x7245 0xE0C0 otra vez
+C 0x724b y 0xE044, el aviso
+L 0x7252 sale_el_recogepelotas  La figura de la derecha va a por la pelota y vuelve
+C 0x7252 los tiles de 0x774F, que le hacen sitio
+C 0x7258 0xE03C es en que paso va
+C 0x725d le carga las posturas de la tabla de 0x776C
+C 0x7262 y suena mientras corre
+C 0x7265 espera al cuadro siguiente
+C 0x726d con el contador puesto a mano, porque la partida esta parada
+C 0x7272 cada seis cuadros cambia de paso
+C 0x727d y alterna entre los dos de andar
+C 0x7285 dos de paso y 0x64 de meta
+C 0x7288 0xE0B7 dice de que lado quedo la pelota
+C 0x728b 0x63 es la mitad de la pista
+C 0x728d 0xE03A es su columna
+C 0x7292 y si es del otro lado, el paso va al reves
+C 0x729d un paso mas
+C 0x72a3 los atributos de sus cuatro sprites
+C 0x72a6 a la VRAM 0x3B3C, o sea a partir del sprite 15
+C 0x72a9 dieciseis bytes: cuatro sprites
+C 0x72ae 0xE0B8 es la columna de la pelota
+C 0x72b3 0xE03B es su fila
+C 0x72b9 y se le acerca de dos en dos
+L 0x72c0 recoge_y_vuelve  Se lleva la pelota y desanda el camino
+C 0x72c0 0xE0C2 guarda donde estaba la pelota
+C 0x72c6 0xCF la esconde
+C 0x72c8 la pelota
+C 0x72cb y su sombra
+C 0x72ce le quita los sprites a la pelota
+C 0x72d1 0xE03C pasa al paso 3: la vuelta
+C 0x72d6 y otra vez sus posturas
+C 0x72e4 seis cuadros por paso, igual que a la ida
+C 0x72f1 pero ahora la postura se invierte
+C 0x72f7 0xE03B, su fila
+C 0x72fa hasta 0xD6, que es de donde salio
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x7304 dos de paso, como a la ida
+C 0x7306 0xE0C2, donde recogio la pelota
+C 0x7309 0x63 es la mitad de la pista
+C 0x730d y del otro lado, el paso al reves
+C 0x7310 0x4F es su sitio de siempre
+C 0x7316 y mientras anda, sus posturas
+L 0x731b guarda_al_recogepelotas  Al llegar a su sitio, se le quitan los sprites
+C 0x731b los atributos de sus cuatro sprites
+C 0x731e dieciseis bytes a 0xCF, o sea escondidos
+C 0x7325 0xE03C a cero: ya no esta en escena
+C 0x732b los tiles de 0x7755, que le devuelven el fondo
+C 0x7331 y suena la vuelta
+L 0x733b reparte_el_punto  Decide a quien va el punto, lo anuncia y prepara el siguiente
+C 0x733c 0xE040 es el numero de rotulo que toca
+C 0x733f borra el que hubiera
+C 0x7342 0xE046 marca la falta
+C 0x734c rotulo 4
+C 0x734f y su sonido
+C 0x7359 orden 4 a la interrupcion
+C 0x7362 0xE04A marca el punto cerrado
+C 0x736a 0xE050, el turno de saque
+C 0x736d y pasa al siguiente, de cuatro en cuatro
+C 0x7374 en dobles hay que recolocar la pareja
+C 0x7377 con dos jugadores el turno alterna de dos en dos
+C 0x737d y en dobles, de cuatro en cuatro
+C 0x7385 ocho bytes por bloque de puestos
+C 0x7388 los puestos de individuales
+C 0x7391 y estos los de dobles
+C 0x7394 0xE050 otra vez
+C 0x739b en la mitad de los turnos se cambian de lado
+C 0x73a3 0xE052 recibe los ocho bytes
+C 0x73ab pinta el tanteo
+C 0x73b0 orden 4 a la interrupcion
+C 0x73b5 0xE030 y 0xE031, los tanteos de los dos
+C 0x73b8 y los rotulos
+C 0x73bb 0xE048 dice si se acabo el juego
+C 0x73c6 0xE038 cuenta los juegos ganados
+C 0x73c9 y 0xE0E0 el set
+L 0x73cf sigue_el_partido  Vuelve a por el punto siguiente, o cierra el partido
+C 0x73cf 0xE003, la partida en marcha
+C 0x73d4 0xE0E0: si se acabo el set, se anuncia
+C 0x73db 0xE002 dice si hay alguien jugando
+C 0x73df en la demostracion, vuelta a empezar
+C 0x73e2 0xE005 es lo que se pulso
+C 0x73e5 y 0xE006 lo recuerda para el arranque
+C 0x73eb 0xE032 y 0xE035, los juegos de cada uno
+C 0x73f8 la musica de final
+L 0x7400 fin_del_partido  Rotulo de cierre y vuelta al titulo
+C 0x7400 rotulo 12
+C 0x7408 y su musica
+C 0x740d espera a que 0xE213 diga que ha terminado de sonar
+C 0x7415 orden 3 a la interrupcion
+C 0x7418 y se vuelve al principio de todo
+L 0x741b anuncia_el_set  Escribe el rotulo del set que se acaba de ganar
+C 0x741b 0xE038, los juegos ganados
+C 0x741e los rotulos del set empiezan en el 9
+C 0x7428 orden 4 a la interrupcion
+C 0x742b y se limpian las dos variables
+L 0x7431 pinta_el_rotulo  Borra el rotulo de en medio y pone el que toque
+C 0x7432 los rotulos van a la VRAM 0x38E4
+C 0x7438 la tabla de mensajes de 0x763A
+C 0x743b el 0 es el que borra
+C 0x743f y ahora el de verdad, en el mismo sitio
+C 0x7448 0xE040 dice cual
+L 0x744b escribe_el_rotulo  Busca el mensaje en la tabla y lo vuelca
+C 0x744b dos bytes por entrada
+C 0x744f y de ahi sale el puntero al texto
+C 0x7454 el puerto de datos del VDP
+C 0x7459 y lo pinta con el interprete de listas de tiles
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x745e pinta_el_tanteo  Escribe los dos tanteos, y hace parpadear el aviso de falta
+C 0x745e 0xE040, el rotulo que hay puesto
+C 0x7461 el 1 es el de falta, que ademas parpadea
+C 0x7464 0xE0C0 marca la pelota rodando
+C 0x746c y suena
+C 0x746f los colores de 0x790A
+C 0x7472 a la VRAM 0x0528, que aqui es la tabla de COLORES
+C 0x7475 cuatro tiles, ocho bytes cada uno
+C 0x7477 el contador de cuadros marca el ritmo
+C 0x747f cada siete cuadros se cambia
+C 0x7483 y al otro juego de colores: eso es el parpadeo
+C 0x748b 0xE229 corta el parpadeo cuando acaba el aviso
+C 0x7492 el tanteo de arriba va a la VRAM 0x3919
+C 0x7498 la tabla de tanteos de 0x76D7
+C 0x749b 0xE031 es el punto que lleva
+C 0x74a1 y el de abajo a 0x39FB
+C 0x74aa 0xE030, el otro
+C 0x74b3 0xE003: la partida sigue
+C 0x74b6 0xE060 congela la pista
+C 0x74ba 0xE0A8 a cero: la jugada se detiene
+C 0x74c0 y se limpian dieciseis bytes de 0xE250
+C 0x74ca 0xE061 lo pone la interrupcion cuando ha terminado
+L 0x74d5 acaba_el_juego  Anuncia el juego ganado y actualiza los juegos de cada uno
+C 0x74d5 orden 1 a la interrupcion
+C 0x74dc rotulo 7, el de juego ganado
+C 0x74e2 0xE048 dice si ademas se acabo el set
+C 0x74e8 la musica del juego
+C 0x74f1 espera a que termine de sonar
+C 0x74fa dos bandos
+C 0x74fc los juegos de arriba van a la VRAM 0x382E
+C 0x74ff 0xE032, los juegos del primero
+C 0x7503 0xE038 cuenta los sets
+C 0x750a tres bytes por casilla del marcador
+C 0x7511 los digitos son 0xF0 mas la cifra
+C 0x7519 y los de abajo a la VRAM 0x384E
+C 0x751c 0xE035, los del segundo
+C 0x7524 y se borra el rotulo
+L 0x752a empieza_el_punto  Deja limpias las variables del punto y coloca la pelota
+C 0x752a 0xE0A0, 0x35 bytes de variables de la jugada
+C 0x7533 0xE043, doce mas
+C 0x753b los ocho valores de arranque de 0x550A
+C 0x753e van a 0xE0B7, que es la pelota
+C 0x7545 y los cinco de 0x775B
+C 0x7548 a 0xE0AC
+C 0x754f 0xE062 a cero
+C 0x7553 0xE051 y 0xE050 llevan el turno
+C 0x755a en dobles el turno da cuatro vueltas
+C 0x7565 0xE00E, cuantos jugadores hay
+C 0x7571 y de ahi sale la columna del que saca
+C 0x7577 0x14 de altura y 0xFF de marca
+C 0x757a 0xAA es la fila desde la que se saca
+C 0x757c con dos jugadores se mira el bit 1
+C 0x7587 y con uno, el bit 0
+C 0x758b del otro lado, diez de altura
+C 0x758e y 0x23, la fila de arriba
+C 0x7592 0xE0B7 es la pelota
+C 0x7596 su columna
+C 0x7599 y la de su sombra
+C 0x759c la fila
+C 0x75a0 la sombra, trece mas abajo
+C 0x75a5 y 0xE0D7 dice hacia donde sale
+C 0x75aa 0xE0DF a 0xFF
+C 0x75ad 0xE042 sube uno: hay punto en marcha
+C 0x75b2 0xE060 a cero: la pista se descongela
+C 0x75b6 0xE0D8 a uno: ya hay pelota
+C 0x75b9 y a colocar a todos para el saque
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x75be pinta_tres_filas  Suelta parejas de tiles en tres filas seguidas de la VRAM
+C 0x75be tres filas
+C 0x75c0 empezando en la VRAM 0x395B
+C 0x75c3 dos tiles por fila
+C 0x75cb y la fila siguiente, 0x20 bytes mas abajo
+L 0x75d5 parpadea_el_bando  Enciende y apaga el rotulo del que le toca sacar
+C 0x75d5 PLY y MSX
+C 0x75d8 o 1UP y 2UP si juegan dos personas
+C 0x75e0 el de arriba va a la VRAM 0x3829
+C 0x75e3 0xE0C6 dice cual de los dos parpadea
+C 0x75e9 tres tiles de diferencia entre uno y otro
+C 0x75ee y el de abajo, en 0x3849
+C 0x75f0 tres tiles
+C 0x75f2 el bit 4 del contador marca el ritmo
+C 0x75fa 0xE0C7 y 0xE0C8 evitan repetir el mismo paso
+C 0x7602 apagado: se escribe el tile vacio
+C 0x7607 tres tiles a cero
+C 0x760b y aqui el encendido
+C 0x7617 con el rotulo de verdad
+L 0x761a pinta_los_dos_bandos  Deja los dos rotulos puestos, sin parpadeo
+C 0x761a dos bandos
+C 0x761c PLY y MSX
+C 0x761f el primero en la VRAM 0x3829
+C 0x7622 o 1UP y 2UP con dos jugadores
+C 0x762a tres tiles cada uno
+C 0x7630 y el segundo una fila mas abajo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x78a0 coloca_al_recogepelotas  Le carga las posturas y le coloca sus cuatro sprites
+C 0x78a1 sus atributos viven en la VRAM 0x3B2C
+C 0x78a4 y sus patrones en la 0x1960, o sea a partir del sprite 0x2C
+C 0x78a7 0xE03C es su paso
+C 0x78ab dos bytes atras estan 0xE03A y 0xE03B: su sitio
+C 0x78af la tabla de grupos de 0x776C
+C 0x78b2 dos bytes por entrada
+C 0x78b6 el primer byte del grupo dice cuantas capas se dibujan
+C 0x78ba y detras van los cinco punteros
+C 0x78bf un puntero con el byte alto a cero es una capa vacia
+C 0x78c2 y si no, se descomprimen sus 32 bytes
+C 0x78c5 la capa siguiente va 32 bytes mas alla
+C 0x78cb y el puntero siguiente, dos mas
+C 0x78d0 el sexto puntero lleva a las parejas (y,x)
+C 0x78d8 el puerto de datos del VDP
+C 0x78dd cuatro sprites
+C 0x78e0 coloca el puntero de escritura
+C 0x78e4 un 0xCF en la y esconde ese sprite
+C 0x78e8 y si no, se le suma la posicion del recogepelotas
+C 0x78ea 0xD0 es el valor que le dice al VDP que pare
+C 0x78ee asi que se cambia por 0xCF, que es la fila de al lado
+C 0x78f6 y ahora la x, con su suma
+C 0x78fe cuatro bytes por sprite: y, x, patron y color
+C 0x7903 hasta los cuatro
+L 0x7932 reparte_el_tanteo  La cuenta del tenis: 15, 30, 40, iguales y ventaja
+C 0x7933 0xE041 pide repartir el punto
+C 0x7938 y se apaga en cuanto se atiende
+C 0x7939 0xE040 en adelante, los rotulos
+C 0x7941 0xE0C0 marca la pelota rodando
+C 0x7947 0xE042 dice si el punto seguia abierto
+C 0x794f el bit 0 de 0xE043: la pelota entro
+C 0x7953 0xE0E2 marca el punto ya repartido
+C 0x7957 0xE042 a cero
+C 0x795a rotulo 8
+C 0x7964 rotulo 7 y sonido 1
+C 0x796e 0xE045 dice si la falta fue de saque
+C 0x7973 0xE04B se queda con quien pierde el punto
+C 0x797b y aqui la pelota que se fue fuera
+C 0x7980 rotulo 5, con su sonido
+C 0x798f 0xE049 y 0xE04E piden recolocar a todos
+C 0x7996 el bit 0 de la casilla siguiente
+C 0x799f 0xE0C0 otra vez
+C 0x79b1 0xE049: hay que recolocar
+C 0x79b4 0xE030 y 0xE031 son los puntos de los dos
+C 0x79ba 0xE045 dice de quien fue la falta
+C 0x79c1 0xE04B, quien pierde
+C 0x79c8 con dos jugadores hay que mirar el turno
+C 0x79cd 0xE050, de quien es el saque
+C 0x79d9 y el que gana sube un punto
+C 0x79db con tres puntos, el juego esta al borde
+C 0x79df si los dos van a tres, son iguales
+C 0x79e5 con seis, se acabo el juego
+C 0x79e9 el cinco es la ventaja
+C 0x79ed y si la pierde, vuelven a tres: iguales otra vez
+C 0x79f1 0xE046 avisa de la falta
+C 0x79f5 el cuatro es el 40
+C 0x79f9 y si el otro esta en tres, se va a ventaja
+L 0x7a02 apunta_el_juego  Sube el juego al que lo gana, y mira si con eso cierra el set
+C 0x7a02 0xE00E, cuantos jugadores hay
+C 0x7a09 0xE050, el turno de saque
+C 0x7a13 en dobles se le da la vuelta al bando
+C 0x7a19 0xE032 son los juegos del primero
+C 0x7a1c 0x30 es la casilla de arriba
+C 0x7a23 y 0xE035 los del segundo
+C 0x7a25 0xE0C6 dice cual de los dos rotulos parpadea
+C 0x7a28 0xE038 es el set que se juega
+C 0x7a2f y el juego sube uno
+C 0x7a31 PROTECCION ANTICOPIA: 0x409A es el `ret` del manejador de interrupcion
+C 0x7a34 en ROM no pasa nada, pero en RAM ese `ret` se vuelve `nop` y cae en INIT
+C 0x7a36 0xE04A marca el juego cerrado
+C 0x7a39 con seis juegos se gana el set
+C 0x7a3b 0xE047 lo anuncia
+C 0x7a3e y en el ultimo set hay que mirar tambien al otro
+C 0x7a48 0xE048: se acabo el partido
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x7a4c suena  Pide una musica o un efecto, si el momento lo permite
+C 0x7a4d los sonidos 1, 2 y 3 suenan siempre
+C 0x7a57 0xE002 dice si hay alguien jugando
+C 0x7a5b y en la demostracion, todo lo demas se calla
+L 0x7a68 arranca_sonido  Reserva los canales que hagan falta y engancha la melodia
+C 0x7a68 0xE213 es la prioridad del primer canal
+C 0x7a6b tres canales por omision
+C 0x7a6e por encima de 0x81 es una musica: se lleva los tres
+C 0x7a72 y si no, es un efecto de un solo canal
+C 0x7a74 el sonido 10 es el que va en dos canales
+C 0x7a78 se prueba primero con uno
+C 0x7a7c y si cabe, se le anaden los canales 0x4B y 0x4C
+C 0x7a88 0xE229 es la prioridad del tercero
+L 0x7a8a cabe_el_sonido  Solo deja entrar al que tenga mas prioridad que el que suena
+C 0x7a8c los seis bits de abajo son la prioridad
+C 0x7a90 y se comparan con la del que pide
+C 0x7a93 se guarda la nueva
+C 0x7a94 si el que sonaba mandaba mas, se acabo
+C 0x7a95 dos bytes por melodia
+C 0x7a96 la tabla vive en 0x7C67
+L 0x7aa0 engancha_melodia  Deja el canal listo para empezar a leer la melodia
+C 0x7aa0 la cuenta atras arranca en uno: suena ya
+C 0x7aa3 y el paso, tambien
+C 0x7aa6 la prioridad
+C 0x7aa8 y el puntero a la melodia, byte a byte
+C 0x7aae cinco bytes mas alla esta el resto del estado
+C 0x7ab3 que empieza a cero
+C 0x7ab8 y otra vez con el canal siguiente
+L 0x7abb sube_de_octava  El 0xFE de una melodia: cambia la octava y sigue
+C 0x7abc el byte 9 lleva la octava
+C 0x7ac0 si llega al tope, la melodia se acaba
+C 0x7ac9 el byte 2 es la prioridad, que se conserva
+C 0x7acd y se vuelve a enganchar con la octava nueva
+L 0x7ad6 enciende_canal  Toca el registro 7 del PSG para dejar sonar o callar un canal
+C 0x7ad6 0xE210 es la copia del registro 7
+C 0x7ada el canal 1 no se desplaza
+C 0x7ae0 y los demas, tres bits por canal
+C 0x7ae3 segun D, se enciende o se apaga
+C 0x7aeb el bit 2 siempre puesto: el tercer canal de ruido
+C 0x7aed salvo si el bit 5 pide ruido de verdad
+C 0x7af3 se guarda la copia
+C 0x7af9 y al registro 7 del PSG
+L 0x7afc reproduce  Un cuadro de sonido: los tres canales, uno detras de otro
+C 0x7afc la copia del registro 7
+C 0x7b03 el canal 1
+C 0x7b05 0xE211 es el estado del primero
+C 0x7b0a tres canales
+C 0x7b0c once bytes por canal
+C 0x7b10 el byte 2 a cero significa canal libre
+C 0x7b18 dos registros de PSG por canal
+C 0x7b1b y al estado del canal siguiente
+L 0x7b20 canal  Avanza un canal: la nota, el volumen y lo que pida la melodia
+C 0x7b21 el bit 6 pide que no suene
+C 0x7b25 y si no, se enciende
+C 0x7b29 el byte 2, la prioridad
+C 0x7b2d con el bit 7 puesto es un efecto, que va por otro lado
+C 0x7b30 el byte 0 es lo que le queda a la nota
+C 0x7b33 mientras dure, no se lee nada
+C 0x7b34 los bytes 3 y 4 son el puntero a la melodia
+C 0x7b3b un 0xFE cambia de octava
+C 0x7b40 y por encima, la melodia se acaba
+C 0x7b42 el bit 7 del byte 2, otra vez
+C 0x7b49 el nibble alto manda: un 2 pone el volumen
+C 0x7b52 y el byte 1 se lo queda
+C 0x7b57 un 1 es la duracion
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x7b60 los cinco bits de abajo son el ruido
+C 0x7b65 registro 6 del PSG: el periodo del ruido
+C 0x7b6b y se enciende el canal
+C 0x7b71 el bit 6 del byte 2 es el canal de solo ruido
+C 0x7b78 el canal 5 es el que lo lleva
+C 0x7b7e y se guarda por donde iba la melodia
+L 0x7b88 nota_nueva  Lee la nota de la melodia y la manda al PSG
+C 0x7b88 el nibble alto es el semitono
+C 0x7b8b y el bajo, lo que dura
+C 0x7b8e el segundo byte de la nota
+C 0x7b90 se apunta por donde va la melodia
+C 0x7b97 y se manda al PSG
+C 0x7b9a el semitono queda en el nibble bajo
+L 0x7b9f arranca_la_nota  Recarga la cuenta atras y el volumen de la nota
+C 0x7ba0 el byte 1 es lo que dura
+C 0x7ba3 el byte 0 la va gastando
+C 0x7ba6 y el byte 8 va tres por delante: el ataque
+L 0x7bad calla_el_canal  Deja el canal libre al acabarse la melodia
+C 0x7bae el byte 9, la octava, a cero
+C 0x7bb3 se apaga
+C 0x7bb8 y el byte 2 a cero: canal libre
+L 0x7bbe gasta_la_nota  Baja la cuenta atras y va apagando el volumen
+C 0x7bbe el byte 0
+C 0x7bc1 y al llegar a cero, a por la nota siguiente
+C 0x7bc4 el byte 8 es el que dibuja la caida del volumen
+C 0x7bd7 el byte 7 es el volumen de ahora
+C 0x7bdb y por debajo de cero, no baja mas
+L 0x7be0 pon_volumen  Escribe el volumen del canal en el registro que le toca
+C 0x7be2 los registros 8, 9 y 10 del PSG
+L 0x7be8 manda_de_la_melodia  Los bytes de control: vibrato, octava y ancho
+C 0x7be8 el nibble alto manda
+C 0x7bea un 0xD es el paso del vibrato
+C 0x7bf1 y va al byte 0x0A
+C 0x7bf6 un 0xF es el ancho
+C 0x7bfc que va al byte 6
+C 0x7c01 y un 0xE la octava
+C 0x7c07 al byte 5
+C 0x7c0c el nibble bajo dice cuantos pasos
+C 0x7c0f y el paso se suma tantas veces
+C 0x7c14 uno por vuelta
+L 0x7c19 nota_con_vibrato  La misma nota, pero con la duracion y el ataque puestos
+C 0x7c19 el byte 1, la duracion
+C 0x7c1e se apunta por donde va la melodia
+C 0x7c24 el nibble alto es el semitono
+C 0x7c2b doce semitonos tiene la escala
+C 0x7c2d el byte 7 es el volumen
+C 0x7c32 y si no llega, se coge el ancho del byte 6
+L 0x7c38 pon_la_nota  Busca el periodo del semitono y lo sube de octava
+C 0x7c3c la escala de doce vive en 0x7C5D
+C 0x7c42 el periodo de la nota
+C 0x7c45 el byte 5 es la octava
+C 0x7c4c y cada octava es doblar el periodo
+L 0x7c4f manda_periodo  Escribe el periodo de dieciseis bits en los dos registros del canal
+C 0x7c50 primero el byte alto
+C 0x7c57 y luego el bajo
+L 0x7ee9 mueve_al_humano  Entre puntos, lleva al jugador de vuelta a su puesto
+C 0x7ee9 0xE060 solo deja pasar cuando la pista esta congelada
+C 0x7eee 0xE100, el primero
+C 0x7ef2 0xE240 lleva su estado
+C 0x7ef6 primero mira si ya alcanza la pelota
+C 0x7efb los cuatro bits de abajo del estado
+C 0x7eff el bit 0
+C 0x7f00 0x7A y 0x84 son el puesto de espera
+C 0x7f05 y si no, se va a donde cae la pelota
+L 0x7f09 apunta_al_puesto  Guarda cuanto le falta para llegar a su sitio
+C 0x7f09 0xE060 otra vez
+C 0x7f0f dos filas menos
+C 0x7f11 y doce columnas
+C 0x7f15 el byte 2 es su fila
+C 0x7f19 lo que le falta por ese eje
+C 0x7f1c y el byte 3 su columna
+C 0x7f26 se le limpian los bits de abajo del estado
+L 0x7f2a anda_hacia_el_puesto  Convierte lo que falta en direcciones de mando
+C 0x7f2b el eje de las filas
+C 0x7f31 y el de las columnas
+C 0x7f37 si no falta nada por ninguno, ya esta
+C 0x7f39 el bit 4 es el disparo
+C 0x7f3f y todo junto al byte 7 de la ficha
+L 0x7f43 alcanza_la_pelota  Enciende el bit 4 si la pelota le queda a mano
+C 0x7f43 se apaga antes de mirar
+C 0x7f49 saca donde esta la pelota
+C 0x7f4c rectangulo 6, el del alcance a mano
+C 0x7f52 fuera: se queda apagado
+C 0x7f53 y dentro, encendido
+L 0x7f56 espera_a_todos  No deja seguir hasta que los cuatro estan en su sitio
+C 0x7f56 0xE060: solo mientras la pista esta congelada
+C 0x7f5b manda a cada uno a su puesto
+C 0x7f5e 0xE250 son los cuatro estados
+C 0x7f61 cuatro jugadores
+C 0x7f63 el 2 es "ya llegue"
+C 0x7f66 y si alguno no lo esta, se espera
+C 0x7f67 tres bytes por jugador
+C 0x7f6c y cuando estan los cuatro, se limpian los dieciseis
+C 0x7f76 0xE049 a cero: ya no hay que recolocar
+C 0x7f7a y 0xE061 avisa de que ha terminado
+L 0x7f7e reparte_los_puestos  Da por colocados a los que no juegan
+C 0x7f7e con dos jugadores sobran dos
+C 0x7f85 asi que 0xE256 y 0xE259 se ponen a 2 de salida
+C 0x7f8e y con dobles, ninguno sobra
+C 0x7f95 en la demostracion sobran otros dos
+C 0x7f9b 0xE100, el primero
+C 0x7f9f y 0xE250 su estado
+C 0x7fa2 0xE052 son los puestos que se copiaron
+C 0x7fa9 0xE130, el segundo
+C 0x7fb6 0xE160, el tercero
+C 0x7fc3 y 0xE190 el cuarto
+L 0x7fcd lleva_a_su_puesto  Un paso de un jugador hacia el sitio que le toca
+C 0x7fcd se le da la vuelta a la pareja de coordenadas
+C 0x7fd0 el estado: 0 es recien empezado
+C 0x7fd5 se le apunta el destino
+C 0x7fd9 y pasa al estado 1: andando
+C 0x7fdc el 2 es que ya llego, y entonces no se le toca
+C 0x7fe0 un paso mas
+C 0x7fe4 y cuando no falta nada, estado 2
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+C 0x45b8 el puerto de datos del VDP, que hay que leer de la BIOS
+C 0x45bd y el mismo byte, tantas veces como diga B
+C 0x439c la opcion nueva
+C 0x439f dos bytes atras esta la fila del cursor
+C 0x43b1 la opcion nueva, ya dada la vuelta
+C 0x43b4 y el cursor baja lo que toque
+C 0x5928 cuatro bytes por sprite
+C 0x592a directos al puerto de datos
+C 0x5959 dos bytes por entrada, que el que llama ya ha doblado
+C 0x595c y de la tabla sale un puntero, en little endian
+C 0x7a60 se guardan los dos pares que la melodia va a tocar
+C 0x7a62 y a reservar canal
+C 0x755c la casilla de antes es el turno
+C 0x755f el bit 0 dice de que lado se saca
+C 0x756e tres bytes hasta la tabla de columnas
+C 0x5690 se guarda todo, que hacen falta los tres pares
+C 0x5696 la ficha de la pareja empieza en direccion par
+C 0x5698 su fila y su columna
+C 0x56a7 dieciseis de margen por cada lado: lo que ocupa una figura
+
+# --- las entradas alternativas que se llaman desde otro sitio ---
+L 0x43f5 sigue_la_lista  Entra en el bucle de la lista de tiles sin volver a colocar el puntero
+L 0x520f recalcula_la_trayectoria  Vuelve a montar la parabola desde los parametros del golpe
+L 0x546d coloca_la_pelota  Deja los atributos de los dos sprites de la pelota y su sombra
+L 0x5959 busca_en_tabla_desde  Entra en la busqueda con la tabla ya puesta en HL
+L 0x6e9c intercambia_la_pareja  Cambia de sitio a los dos jugadores de un bando
+L 0x6ecd donde_esta_la_pelota  Devuelve en BC la posicion de la pelota
+L 0x7af3 escribe_registro_7  Guarda la copia y la manda al registro 7 del PSG
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x402a interrupcion_sin_menu  No hay menu en marcha: se atiende la pista
+L 0x4033 interrupcion_sonido  El sonido corre en todos los cuadros
+L 0x4056 interrupcion_con_partida  A partir de aqui, solo si hay partida
+L 0x406c interrupcion_tareas  Las nueve tareas del cuadro, en su orden
+L 0x408b interrupcion_comprueba_cuadro  Si la interrupcion se comio el cuadro, se repite
+L 0x4092 interrupcion_fin  Deja pedido el trabajo del cuadro siguiente
+L 0x40c2 init_apaga_psg  Los tres volumenes del PSG a cero
+L 0x40ed init_pantalla  Deja la pantalla en SCREEN 2 y sin sprites
+L 0x410d init_borra_nombres  Tres vueltas de 256 tiles a cero
+L 0x4124 init_registros_vdp  Los ocho registros, de la tabla de 0x45C9
+L 0x419d titulo_mira_el_reloj  Si el reloj se agota, entra la demostracion
+L 0x41a3 titulo_mira_el_mando  Y si se toca algo, se pasa al menu
+L 0x41bd menu_jugadores_bucle  Espera mientras el reloj y el mando lo permitan
+L 0x41d8 menu_jugadores_opcion  Coge la opcion en la que quedo el cursor
+L 0x41df menu_jugadores_guarda  La deja en 0xE00E y resalta su rotulo
+L 0x41f2 menu_jugadores_confirma  Parpadea hasta que el jugador acepta
+L 0x420f menu_partido_bucle  Lo mismo para el numero de juegos
+L 0x4231 menu_partido_confirma  Parpadea el GAME SELECT elegido
+L 0x4243 pista_bucle_guiones  Ejecuta los guiones de la pista, uno a uno
+L 0x4283 pista_espera_sonido  No arranca hasta que la musica calla
+L 0x4297 lee_joystick_puerto  Entra con el puerto ya elegido en E
+L 0x42c5 teclado_recoloca  Rota los bits para que salgan como los del mando
+L 0x42d3 teclado_bit_3  Copia el bit 3 al 1
+L 0x42d9 teclado_ultima_fila  La cuarta fila, la del disparo
+L 0x42e5 teclado_devuelve  La mascara ya montada
+L 0x4301 traduce_direccion_nibble  Baja los cuatro bits de las flechas
+L 0x4324 lee_los_mandos_bucle  Una vuelta por jugador
+L 0x434e lee_los_mandos_flanco  Compara con lo del cuadro anterior
+L 0x4357 lee_los_mandos_guarda  Deja lo de ahora y lo de antes
+L 0x437b cursor_ya_movido  El bit 0 dice que ya se movio con esta pulsacion
+L 0x439c cursor_sube  Una opcion menos, y el cursor 0x40 mas arriba
+L 0x43a4 cursor_baja  Una opcion mas
+L 0x43b1 cursor_guarda  Deja la opcion y baja el cursor
+L 0x43bf pinta_el_cursor_bucle  Parejas de tiles hasta el 0xFF
+L 0x43e2 cuatro_listas_bucle  Las cuatro listas, una detras de otra
+L 0x43f4 lista_siguiente_byte  El byte que toca de la entrada
+L 0x43fa lista_repite  El 0xFE: n veces el mismo byte
+L 0x4407 lista_fin_entrada  El 0xFF cierra la entrada
+L 0x4411 lista_fin_lista  Y otro 0xFF seguido cierra la lista
+L 0x4424 borra_pantalla_bucle  Tres vueltas de 256
+L 0x443a replica_vram_bucle  Un byte: leer de un sitio y escribir en el otro
+L 0x445a manda_orden_espera  Da vueltas hasta que la interrupcion vacia el buzon
+L 0x4461 guion_bloque  Un bloque del guion, con su comando
+L 0x4471 guion_siguiente_bloque  Descuenta y sigue
+L 0x4477 guion_sub_bloque  Un sub-bloque: direccion, longitud y datos
+L 0x447e guion_byte  El byte que toca, o la orden de repetir
+L 0x4491 guion_fin_sub_bloque  Descuenta el sub-bloque y sigue
+L 0x449b guion_repite_bucle  Suelta el mismo byte, sin pasarse del total
+L 0x44ad guion_patrones_grupo  Un grupo: su direccion y sus indices
+L 0x44b3 guion_patrones_indice  El numero de patron que toca
+L 0x44bc guion_patrones_desplaza  Ocho bytes por patron, tantas veces como el indice
+L 0x44c3 guion_patrones_sigue  Otra vuelta de ocho
+L 0x44c5 guion_patrones_suelta  Los ocho bytes del patron
+L 0x44d5 guion_patrones_fin  Salta el 0xFF final y vuelve
+L 0x44dc guion_relleno_par  Un par de cuenta y valor
+L 0x44f6 guion_repetido_vuelta  El mismo patron, una vez mas
+L 0x4510 escribe_tira_bucle  Tiles consecutivos, uno mas cada vez
+L 0x4539 confirmacion_bucle  Espera mirando el contador y el mando
+L 0x4551 confirmacion_atiende  Sigue leyendo mandos mientras parpadea
+L 0x5226 trayectoria_desde_el_bote  Rehace la parabola tras un bote
+L 0x52a4 avance_con_signo  Suma o resta el avance segun el sentido
+L 0x52ba avance_del_otro_eje  Y lo mismo por el otro eje
+L 0x52f4 rozamiento  Elige cuanto frena la pelota segun donde este
+L 0x531c rozamiento_maximo  El frenazo mas fuerte
+L 0x531e resta_el_rozamiento  Se lo quita a lo que quedaba de recorrido
+L 0x5330 vuelve_a_la_trayectoria  Con lo que queda, otra parabola
+L 0x5333 pelota_fuera_de_juego  0xE0D8 a cero y punto cerrado
+L 0x536c suma_el_paso  El paso del cuadro a la pelota y a su sombra
+L 0x5389 recarga_la_velocidad  Cuando se agota, del escalon siguiente
+L 0x539a comprueba_los_lados  Si se sale por un lado o por el otro, punto
+L 0x53d7 monta_la_altura  Deja la altura para la cuenta siguiente
+L 0x53f7 comprueba_la_sombra  Mira si la pelota alcanza al suelo
+L 0x5412 pega_la_sombra  La sombra se pone donde la pelota
+L 0x5438 tamano_por_el_punto  Dos escalones mas cuando el punto ya esta decidido
+L 0x5447 busca_el_tamano  Coge el par de punteros del escalon
+L 0x5487 divide_vuelta  Una resta mas mientras quepa
+L 0x54ad multiplica_8_vuelta  Un bit del multiplicador
+L 0x54b3 multiplica_8_desplaza  Desplaza los tres bytes del acumulador
+L 0x54c5 multiplica_8_sigue  Hasta agotar los ocho
+L 0x54cd multiplica_16_vuelta  Un bit de los dieciseis
+L 0x54ec multiplica_16_sigue  Hasta los dieciseis
+L 0x557a turno_del_segundo  Al segundo le toca en otro cuadro
+L 0x55a2 jugador_solo_mueve  Se mueve sin recargarle la postura
+L 0x55d9 quien_lo_lleva  Decide si el mando o la maquina
+L 0x55e3 direccion_pedida  Los cuatro bits de abajo del byte 7
+L 0x55fb calcula_el_paso  Saca el paso de la direccion pedida
+L 0x560c salta_los_bits  Se queda con los dos de la cara
+L 0x5620 pon_la_cara  Conserva el estado y le pone hacia donde mira
+L 0x5655 limite_por_la_red  El tope cambia segun de que lado de la red este
+L 0x5670 compara_los_topes  Contra los dos que le tocan
+L 0x5675 topes_iguales  Si coincide con alguno, no se mueve
+L 0x5677 comprueba_los_topes  Por un lado y por el otro
+L 0x5690 mira_al_companero  Saca la posicion del otro de su ficha
+L 0x56a4 companero_delante  El companero va delante
+L 0x56a7 margen_de_la_figura  Dieciseis por lado, que es lo que ocupa
+L 0x56b8 apunta_el_paso  Guarda la posicion nueva y arrastra la pelota
+L 0x56e9 anima_si_se_movio  Solo cambia de pierna si hubo paso
+L 0x56ec pierna_siguiente  El bit 0 del byte 4 alterna
+L 0x56f7 pierna_anterior  Y vuelve
+L 0x571e junta_la_postura  El bit de la pierna con los de la cara
+L 0x5732 golpe_en_marcha  El que ya esta golpeando va por otro lado
+L 0x5743 empieza_el_golpe  Deja el estado en 7 y elige la fuerza
+L 0x5762 golpe_corto  Dos cuadros y catorce de fuerza
+L 0x5769 golpe_largo  Ocho cuadros y veinte
+L 0x576e guarda_la_fuerza  El bit de direccion con el estado
+L 0x577f golpe_de_la_maquina  A la maquina se le da otro angulo
+L 0x5794 cierra_el_golpe  Deja el angulo en su sitio
+L 0x57c6 fichas_bucle  Una ficha de 41 bytes por vuelta
+L 0x57ea fichas_fin  Con dobles no sobra ninguna
+L 0x58bb capa_de_la_postura  Una de las cinco, descomprimida en la VRAM
+L 0x58f9 sprite_escondido  El 0xCF no lleva suma
+L 0x5900 guarda_la_y  Y ahora la x, que si se suma siempre
+L 0x590f vuelca_los_atributos  Los veinte bytes al VDP
+L 0x5926 atributos_sprite  Cuatro bytes por sprite
+L 0x5928 atributos_byte  Byte a byte, al puerto de datos
+L 0x593d byte_comprimido  Un cero es la orden de repetir
+L 0x5944 suelta_ceros  Los ceros que diga la cuenta
+L 0x594e suelta_byte  Y si no, el byte tal cual
+L 0x5950 descomprime_sigue  Hasta los 32
+L 0x5953 descomprime_fin  Devuelve lo guardado
+L 0x67a8 rival_elige_ficha  El de arriba o el de abajo, segun el bando
+L 0x67b5 rival_elige_bando  0xE0D7 dice hacia donde va la pelota
+L 0x67bc rival_mira_la_cara  Y el byte 4 hacia donde mira el jugador
+L 0x67c4 rival_manda_al_primero  Primero el que esta mas cerca
+L 0x67fe rival_comprueba_estado  El bit 0 separa al que juega del que mira
+L 0x680e rival_acerca  Dieciseis mas, para llegar con margen
+L 0x681e rival_prueba_alcance  Mira si ya la alcanza
+L 0x685a franja_centro  Compara con el centro de su franja
+L 0x6864 franja_ya_esta  Si ya esta, no se mueve
+L 0x6880 fuerza_por_el_punto  El punto decidido cambia los limites
+L 0x6893 fuerza_mira_al_companero  0x5D bytes atras esta su posicion
+L 0x68a2 fuerza_signo  El bit 7 dice de que lado queda
+L 0x68a9 fuerza_escalones  Tres escalones, 0x20 y 0x40
+L 0x68b7 fuerza_aplica  Suma el paso tantas veces como escalones
+L 0x68bc fuerza_suma  Una vez mas
+L 0x68bf fuerza_postura  Con la postura baja, un paso extra
+L 0x68ca fuerza_fin  Y a elegir la clase de golpe
+L 0x68ce iguala_vuelta  Un paso de acercamiento
+L 0x68e4 efecto_umbrales  Siete, y va bajando por cada uno que pase
+L 0x6901 efecto_rebaja  Al humano se le quitan dos
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x6905 efecto_solo_maquina  La rebaja solo vale si lo lleva la maquina
+L 0x6924 golpe_por_la_altura  La altura es la pelota menos su sombra
+L 0x6946 golpe_tope  Por encima de 0x20 ya no hay golpe que valga
+L 0x694a golpe_ninguno  Se sale sin elegir nada
+L 0x694c golpe_del_humano  Al humano le tocan otros escalones
+L 0x696a saque_comprueba  Con el margen que le toque
+L 0x6994 saque_sin_margen  Con seis puntos, cero margen
+L 0x6996 saque_recoloca  Ajusta la sombra si se queda corta
+L 0x69a6 saque_recoloca_alto  Y si se pasa por arriba
+L 0x69bf efecto_copia  Los cuatro valores, salteados de dos en dos
+L 0x69d5 correccion_por_la_zona  La correccion depende de por donde ande la pelota
+L 0x69fa correccion_minima  Dieciseis, la mas suave
+L 0x69fc aplica_la_correccion  Se le resta a 0xE0AC
+L 0x6a02 correccion_por_la_altura  Y otra mas si la pelota va muy baja
+L 0x6a15 golpe_de_que_lado  El bit 5 dice de que lado sale
+L 0x6a1d golpe_con_dos  Con dos jugadores hay una vuelta mas
+L 0x6a29 golpe_apunta  Deja pedida la trayectoria nueva
+L 0x6a3c golpe_banderas  Las banderas de los dos bandos
+L 0x6a5b golpe_mira_el_saque  Solo la maquina comprueba el saque
+L 0x6a6d saque_bueno  0x86 es la altura del saque valido
+L 0x6a7e golpe_limpia  Deja las banderas del punto como estaban
+L 0x6aa1 golpe_del_rival  Al rival se le sube el contador del byte 12
+L 0x6af2 margen_fuera  Acarreo limpio: no hay contacto
+L 0x6b01 margen_negativo_arriba  El limite de arriba, con los dos negativos
+L 0x6b07 margen_negativo_fuera  Y fuera
+L 0x6b63 destino_ya_puesto  Si ya tenia destino, se salta la decision
+L 0x6b6b destino_espera  Con la pelota de frente, se queda quieto
+L 0x6b8c destino_donde_cae  Se va a donde va a caer la pelota
+L 0x6ba3 destino_por_el_punto  El punto decidido cambia el sitio
+L 0x6bb4 destino_se_queda  Por debajo de 0x42 no se mueve
+L 0x6bb8 destino_a_la_red  0xD5 es la fila de la red
+L 0x6bc6 destino_tope  Sin pasarse de 0xA0
+L 0x6bc7 destino_margen  Diez menos, para llegar con margen
+L 0x6bcb destino_apunta  Guarda cuanto le falta
+L 0x6bd6 destino_pulsa  Y de ahi salen las direcciones del mando
+L 0x6bf7 fallo_del_rival  El temblor que le pone el registro R
+L 0x6bf8 apunta_el_eje  Lo que falta por el segundo eje
+L 0x6c32 pulsacion_nueva  Compara con lo que se pidio el cuadro anterior
+L 0x6c3a pulsacion_ninguna  Sin direccion
+L 0x6c3b pulsacion_disparo  Y el bit 4, que es el boton
+L 0x6c41 pulsacion_guarda  Todo junto al byte 7 de la ficha
+L 0x6c58 paso_de_la_maquina  A la maquina se le dejan siete bits
+L 0x6c5a paso_ninguno  Si no falta nada, no hay paso
+L 0x6c5e paso_hacia_atras  Uno menos
+L 0x6c64 paso_hacia_delante  Uno mas, con el paso a la mitad
+L 0x6c91 alcance_prueba  Con el rectangulo que le toque
+L 0x6c97 alcance_no  Bit 4 apagado: no llega
+L 0x6c9a alcance_si  Bit 4 encendido
+L 0x6cae alcance_ritmo  Con la jugada viva, uno de cada pocos cuadros
+L 0x6ce1 pareja_mira_la_cara  El byte 4 con los bits de arriba
+L 0x6ce9 pareja_compara  Y se mira si estan juntos
+L 0x6d06 juntos_al_parado  Al parado no se le toca
+L 0x6d43 saque_primero  Al empezar, saca el cuarto
+L 0x6d5d saque_ajusta  Con dos jugadores, uno menos
+L 0x6d5e saque_dos_jugadores  El turno alterna de dos en dos
+L 0x6d64 saque_guarda_turno  El turno elegido
+L 0x6d67 saque_recorre_fichas  Las cuatro, una a una
+L 0x6d6d saque_ficha  0x24 bytes hasta el byte de estado
+L 0x6da0 saque_marca_el_lado  0x80 o 0x40, segun el lado
+L 0x6da5 saque_siguiente_ficha  Y a por la siguiente
+L 0x6dbf saque_banderas  Al que saca se le pone el bit 3
+L 0x6de0 saque_pareja_de_abajo  Los dos de abajo, a repartirse
+L 0x6def saque_pareja_de_arriba  Y los de arriba
+L 0x6dff saque_reparte  Con el papel que le toca a cada uno
+L 0x6e32 dobles_guarda_posturas  Una para cada uno de los de arriba
+L 0x6e55 dificultad_busca  El paso de la curva que toque
+L 0x6ee1 juez_pinta  Los cuatro tiles de la cara, en dos filas
+L 0x6f31 saque_lado_izquierdo  El bit 0 dice de que lado se saca
+L 0x6f4f saque_espera_boton  Hasta que el que saca aprieta
+L 0x6f7d saque_dos_guarda  Con dos jugadores, la otra ficha
+L 0x6f94 saque_corto  El saque no llega
+L 0x6fa5 saque_baja_la_sombra  Y se le deja la altura que le toca
+L 0x6faf saque_comprueba_valido  Mira si el saque valia
+L 0x6fbe punto_repinta  Recalcula y vuelve a pintar la pelota
+L 0x7016 red_frena  0xE0AC se parte por la mitad
+L 0x7023 red_apunta  0xE04C: la red ya esta contada
+L 0x7053 bote_frena  Otra vez la mitad
+L 0x7075 bote_largo  La pelota sale rodando y cambia de sentido
+L 0x7084 bote_suena  Y se recalcula la trayectoria
+L 0x70b3 bote_lado  El bit 0 dice de que lado se juzga
+L 0x70c2 bote_limites  Los limites que se copiaron a 0xE052
+L 0x70e1 bote_bueno  0xE043: la pelota entro
+L 0x70e7 bote_lateral_derecho  El pasillo de 0x7A a 0xAA
+L 0x70ef bote_medio_campo  El otro medio campo
+L 0x7104 bote_lateral_izquierdo  Y el de 0x7A a 0xB1
+L 0x7131 saque_calcula  La diagonal del pasillo de saque
+L 0x714d saque_lado_alto  0x63 parte la pista
+L 0x7158 saque_lado_bajo  Y del otro lado, al reves
+L 0x716d vuelca_tiles_bucle  Un byte por vuelta, con su nop
+L 0x718d punto_guarda_menu  Se queda con lo que se eligio
+L 0x71b2 coloca_bucle  Una ficha por vuelta
+L 0x71c6 punto_recoloca  Si toca, se recolocan todos
+L 0x71ed gira_al_jugador  Se le da la vuelta y se le resta 0x20
+L 0x71fb gira_por_el_turno  Con el turno decide a quien le toca girar
+L 0x720a gira_dos  Dos jugadores por bando
+L 0x720c gira_uno  Un jugador
+L 0x722a punto_suena  Suena lo que 0xE05A diga
+L 0x7230 punto_pinta  El tanteo y los rotulos nuevos
+L 0x723b punto_espera_pelota  Hasta que la pelota se para
+L 0x7265 recogepelotas_ida  Un cuadro de la ida
+L 0x7282 recogepelotas_paso  Alterna entre los dos pasos de andar
+L 0x7285 recogepelotas_rumbo  Dos de paso, y de que lado esta la pelota
+L 0x7297 recogepelotas_avanza  Un paso hacia ella
+L 0x72a3 recogepelotas_atributos  Sus cuatro sprites, a la VRAM 0x3B3C
+L 0x72bb recogepelotas_repinta  Le vuelve a colocar los sprites
+L 0x72d9 recogepelotas_vuelta  Un cuadro de la vuelta
+L 0x72f7 recogepelotas_sube  Deshace la fila que bajo
+L 0x7303 recogepelotas_columna  Y la columna, hacia donde salio
+L 0x730f recogepelotas_llega  Al llegar a 0x4F, se guarda
+L 0x7316 recogepelotas_pinta_vuelta  Sus sprites, otra vez
+L 0x7362 punto_mira_el_juego  0xE04A dice si el juego se cerro
+L 0x7383 juego_indice  Ocho bytes por bloque de puestos
+L 0x739f juego_copia_puestos  Los ocho a 0xE052
+L 0x73bb punto_mira_el_set  0xE048 dice si ademas se acabo el partido
+L 0x73cc punto_siguiente  Y a por el punto que viene
+L 0x73df demostracion_repite  En la demostracion, vuelta a empezar
+L 0x73f7 partido_suena_final  La musica de cierre
+L 0x740d final_espera_musica  Hasta que 0xE213 la deja terminar
+L 0x7413 final_vuelve_al_titulo  Orden 3 y de vuelta al principio
+L 0x746f aviso_parpadea  Alterna los dos juegos de color del rotulo
+
+
+# ======================================================================
+# COMENTARIOS DE LINEA
+# ======================================================================
+L 0x7486 aviso_escribe_color  Suelta los ocho bytes del juego de color
+L 0x7491 tanteo_escribe  Los dos tanteos, arriba y abajo
+L 0x74ca tanteo_espera  Hasta que 0xE061 dice que la interrupcion acabo
+L 0x74ed juego_suena  La musica del juego ganado
+L 0x74fa juego_marcador  Los juegos de los dos bandos
+L 0x7502 juego_bando  Un bando por vuelta
+L 0x7506 juego_busca_casilla  Tres bytes por casilla del marcador
+L 0x7510 juego_escribe_cifra  Los digitos son 0xF0 mas la cifra
+L 0x755c punto_lado_del_saque  El bit 0 dice de que lado se saca
+L 0x756d punto_recupera  Vuelve al principio de la tabla
+L 0x756e punto_busca_columna  Tres bytes hasta las columnas
+L 0x7587 punto_lado_alto  El otro lado de la pista
+L 0x758b punto_altura_alta  Diez de altura y 0x23 de fila
+L 0x7590 punto_coloca_pelota  Deja la pelota y su sombra en su sitio
+L 0x75c3 tres_filas_bucle  Dos tiles, y la fila siguiente
+L 0x75e0 bando_elige_casilla  0xE0C6 dice cual de los dos parpadea
+L 0x75f0 bando_ritmo  El bit 4 del contador marca el ritmo
+L 0x760a bando_enciende  Y aqui se vuelve a escribir el rotulo
+L 0x762a bandos_bucle  Un bando por vuelta, una fila mas abajo
+L 0x78b8 recogepelotas_capa  Una de las cinco capas
+L 0x78c5 recogepelotas_capa_sigue  Treinta y dos bytes mas alla
+L 0x78df recogepelotas_sprite  Un sprite: su y, su x y lo demas
+L 0x78f0 recogepelotas_suelta_y  La y ya sumada
+L 0x78f9 recogepelotas_suelta_x  Y la x
+L 0x7964 tanteo_pelota_fuera  Rotulo 7: la pelota se fue
+L 0x797b tanteo_mira_la_falta  Si hubo falta, otro rotulo
+L 0x798e tanteo_pide_recolocar  0xE049 y 0xE04E lo piden
+L 0x7996 tanteo_sin_falta  El punto se resuelve sin aviso
+L 0x79a5 tanteo_rodando  Con la pelota rodando, otro rotulo
+L 0x79ac tanteo_apunta  Deja pedida la recolocacion
+L 0x79c1 tanteo_quien_pierde  0xE04B se queda con el que lo pierde
+L 0x79c8 tanteo_turno  Con dos jugadores hay que mirar el turno
+L 0x79d9 tanteo_sube_el_punto  El que gana sube uno
+L 0x79e4 tanteo_mira_el_juego  Con seis, el juego esta ganado
+L 0x79f1 tanteo_iguales  Los dos a tres: iguales
+L 0x79f5 tanteo_cuarenta  El cuatro es el 40
+L 0x7a01 tanteo_pierde_ventaja  Se vuelve al que estaba
+L 0x7a18 juego_elige_casilla  0x30 es la casilla de arriba
+L 0x7a25 juego_apunta  El juego sube uno en el marcador
+L 0x7a46 set_comprueba  Y en el ultimo, tambien al otro
+L 0x7a48 set_ganado  0xE048: se acabo el partido
+L 0x7a5f sonido_reserva  Guarda los pares y va a reservar canal
+L 0x7a88 sonido_tercer_canal  0xE229 es la prioridad del tercero
+L 0x7ac8 octava_vuelve_a_enganchar  Con la octava nueva, otra vez
+L 0x7ae0 canal_desplaza  Tres bits por canal
+L 0x7aea canal_enciende  Deja el bit puesto
+L 0x7aeb canal_ruido  El bit 2, salvo que el 5 pida ruido
+L 0x7b0f canal_siguiente  Once bytes hasta el estado del siguiente
+L 0x7b34 canal_lee_melodia  El byte que toca de la melodia
+L 0x7b56 canal_mira_duracion  Un 1 en el nibble alto es la duracion
+L 0x7b71 canal_solo_ruido  El bit 6 es el canal que solo hace ruido
+L 0x7bd4 nota_gasta_ataque  Un paso mas de la caida
+L 0x7bd7 nota_baja_volumen  Y el volumen, hasta cero
+L 0x7bf6 melodia_ancho  Un 0xF es el ancho del vibrato
+L 0x7c01 melodia_octava  Un 0xE la octava
+L 0x7c0c melodia_pasos  Los pasos que se le suman
+L 0x7c14 melodia_suma_paso  Uno mas
+L 0x7c4c nota_dobla_octava  Cada octava es doblar el periodo
+L 0x7f15 puesto_calcula  Lo que falta por cada eje
+L 0x7f3f puesto_guarda_pulsacion  Al byte 7, como si fuera un mando
+L 0x7f63 espera_uno  Mira si este ya llego
+L 0x7f8e puestos_dobles  Con dobles no sobra ninguno
+L 0x7f9b puestos_reparte  Los cuatro, uno a uno
+L 0x7fdc puesto_ya_llego  Al que ya esta no se le toca

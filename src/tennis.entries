@@ -1,0 +1,12 @@
+# Puntos de entrada de Konami's Tennis (Konami, RC-720, 1984). ROM de 16 KB en 0x4000.
+#
+# La BIOS lee la cabecera "AB" y llama a INIT tras inicializar la maquina.
+# En el volcado los bytes 0-9 son 41 42 9B 40 00 00 00 00 00 00: declara SOLO
+# INIT, en 0x409B.
+0x409b   # INIT, declarado en la cabecera del cartucho (bytes 2-3: 9B 40)
+
+# INIT engancha la interrupcion: pone un 0xC3 (jp) en H.KEYI (0xFD9A) y la
+# direccion 0x4010 detras -`ld hl,04010h / ld (0FD9Bh),hl` en 0x40A1-, borra
+# 0xE000-0xE3FE con un ldir y deja la pila ahi. Todo el juego cuelga de la
+# interrupcion y el trazado estatico no puede llegar solo.
+0x4010   # manejador de la interrupcion, enganchado en H.KEYI por INIT (0x40A1)
