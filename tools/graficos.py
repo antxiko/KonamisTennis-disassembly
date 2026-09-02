@@ -21,13 +21,30 @@ import pantallas                                           # noqa: E402
 import sprites                                             # noqa: E402
 
 ORG = 0x4000
-# El rotulo ocupa dos filas de dieciocho tiles, desde la VRAM 0x3885 y 0x38A5,
-# o sea las filas 4 y 5 a partir de la columna 5. Se recorta con un margen.
-ROTULO = (34, 40, 22, 152)          # y0, x0, alto, ancho
+MARGEN_ROTULO = 4       # pixeles de aire alrededor del rotulo recortado
 
 
 def recorta(img, y0, x0, alto, ancho):
     return [f[x0:x0 + ancho] for f in img[y0:y0 + alto]]
+
+
+def marco_del_rotulo(v, margen=MARGEN_ROTULO):
+    """Donde cae el rotulo, medido en la tabla de nombres y no a ojo.
+
+    El rotulo son las DOS primeras filas de la portada que tienen algo escrito
+    -las que la lista de tiles de 0x45D1 llena desde 0x3885 y 0x38A5-, y su
+    ancho es el de la columna mas a la izquierda a la mas a la derecha con tile
+    distinto de 0, que es el espacio. Sacarlo de aqui y no de cuatro numeros
+    escritos a mano evita el fallo obvio: recortar dos pixeles dentro y comerse
+    la fila de arriba, o quedarse corto de ancho y partir la ultima palabra.
+    """
+    celdas = [(i // 32, i % 32) for i in range(768) if v.b[0x3800 + i]]
+    filas = sorted({f for f, _ in celdas})[:2]
+    cols = [c for f, c in celdas if f in filas]
+    y0, y1 = filas[0] * 8, (filas[-1] + 1) * 8
+    x0, x1 = min(cols) * 8, (max(cols) + 1) * 8
+    return (max(0, y0 - margen), max(0, x0 - margen),
+            y1 - y0 + margen * 2, x1 - x0 + margen * 2)
 
 
 def hoja_de_tiles(v, tercio, cuantos=256, cols=16):
@@ -128,7 +145,7 @@ def main():
     pista = pantallas.pista(rom)
     ip, iq = pantallas.pinta(portada), pantallas.pinta(pista)
 
-    png("rotulo.png", recorta(ip, *ROTULO), escala=4)
+    png("rotulo.png", recorta(ip, *marco_del_rotulo(portada)), escala=4)
     png("portada.png", ip)
     png("pista.png", iq)
     png("juez.png", rejilla(dibuja_al_juez(rom, pista), 3, sep=2), escala=6)
