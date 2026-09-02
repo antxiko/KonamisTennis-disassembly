@@ -84,28 +84,32 @@ audio{display:block;width:100%;max-width:640px;margin:.75rem 0 1.5rem}
 </style>
 <div class="w"><nav class="top"><a href="index.html">Home</a><a href="GETTING-STARTED.html">Start</a><a href="THE-GAME.html">The game</a><a href="THE-CARTRIDGE.html">The cartridge</a><a href="THE-CODE.html">The code</a><a href="FINDINGS.html" style=color:var(--tinta)>Findings</a><a href="IN-THE-EMULATOR.html">In the emulator</a><a href="OPEN-QUESTIONS.html">Open questions</a><a href="es/HALLAZGOS.html" style="margin-left:auto;color:var(--oro)">Castellano</a></nav>
 <h1 id="findings">Findings</h1>
-<h2 id="it-defends-itself-against-copies-by-writing-on-itself">It defends itself against copies by writing on itself</h2>
-<p>In the whole ROM there is <b>exactly one</b> instruction that writes into the cartridge&#x27;s own page, and it is at 0x7A31: <code>ld (0409ah),a</code>, with A zero.</p>
-<p>The address is not just any address. <b>0x409A is the <code>ret</code> that ends the interrupt handler</b>, and at 0x409B, right behind it, INIT begins.</p>
-<p>In a cartridge nothing happens: ROM will not take a write. In a copy loaded into RAM that <code>ret</code> becomes a <code>nop</code>, the interrupt runs straight on into INIT, and <b>the game restarts on every frame</b>. Nothing is checked and nothing is announced; it simply stops working.</p>
-<p>And it fires late — on winning a game — so a copy looks fine for a good while. It is the same idea the <b>RC-701</b> of this series uses, where it goes with an <code>ldir</code> over the dispatcher. Here it is unpatched and working.</p>
 <h2 id="the-screen-s-three-thirds-with-a-single-loop">The screen&#x27;s three thirds, with a single loop</h2>
-<p>0x442D copies VRAM to VRAM byte by byte, and is asked for <b>4,095</b> bytes from 0x0000 to 0x0800. Since the destination runs 0x800 ahead of the source, past the first block it is reading what it has just written. One loop, three identical thirds, 4 KB of data saved. Done twice: colours, then patterns.</p>
+<p>0x442D copies VRAM to VRAM byte by byte, and is asked for <b>4,095</b> bytes from 0x0000 to 0x0800. Since the destination runs 0x800 ahead of the source, past the first block it is reading what it has just written. One loop, three identical thirds, 4 KB saved. Done twice: colours, then patterns.</p>
 <h2 id="the-colour-table-underneath-the-pattern-table">The colour table underneath the pattern table</h2>
-<p><code>R4 = 0x07</code> puts the patterns at 0x2000 and <code>R3 = 0x7F</code> the colours at 0x0000, because in SCREEN 2 those registers are a base bit and a mask, not an address. Read the other way round, the shapes still come out — the two blocks are symmetric — but the colours arrive in bands. That is the symptom.</p>
+<p><code>R4 = 0x07</code> puts the patterns at 0x2000 and <code>R3 = 0x7F</code> the colours at 0x0000, because in SCREEN 2 those registers are a base bit and a mask, not an address.</p>
+<p>Read the other way, the symptom is deceptive: the shapes still come out — the two blocks are symmetric — but the colours arrive in bands.</p>
 <h2 id="the-chair-umpire-follows-the-ball-with-his-eyes">The chair umpire follows the ball with his eyes</h2>
 <p>He is 2x2 tiles of the name table, not a sprite. 0x6ED2 reads the ball&#x27;s position in 0xE0B7, splits the court into three with 0x48 and 0x78, and picks one of the three faces at 0x715D. Only the eyes differ.</p>
-<h2 id="the-opponent-misses-on-purpose">The opponent misses on purpose</h2>
+<h2 id="a-figure-is-five-sprites">A figure is five sprites</h2>
+<p>Every pose is five stacked 16x16 sprites. 0x5961 has 58 entries pointing at 37 twelve-byte descriptions — five pattern pointers and one to the five (y,x) pairs — which between them spend 189 patterns.</p>
+<p>The colour is not there: it comes from the player&#x27;s record, which is why players 3 and 4 have magenta hair where 1 and 2 have black.</p>
+<h2 id="the-opponent-misses-using-the-refresh-register">The opponent misses using the refresh register</h2>
 <p>0x6BE9 does <code>ld a,r</code>. R is the DRAM refresh counter, which the Z80 advances on every instruction, so it cannot be predicted. Rotated twice, it is the wobble in the opponent&#x27;s aim — and 0x6BEE leaves it at zero on half the frames.</p>
 <h2 id="the-difficulty-rises-with-the-rally">The difficulty rises with the rally</h2>
 <p>0xE20A counts the strokes. 0x6E3B halves it, caps it at fifteen, and looks it up in one of the three sixteen-step curves at 0x6E67. The longer the point runs, the better the machine plays.</p>
 <h2 id="six-bytes-of-code-in-the-sprite-table">Six bytes of code in the sprite table</h2>
 <p>0x4272 asks for 22 bytes of sprite attributes from 0x7890, where there are only 16 of data. The six that follow are the start of the routine at 0x78A0, and they go straight into VRAM at 0x3B3C, where they stay for the whole match. It does not show, because the patterns they point at are empty.</p>
 <h2 id="a-racket-nobody-draws">A racket nobody draws</h2>
-<p>Nine bytes at 0x61F5 decompress into a valid 16x16 sprite — a small racket. The word 0x61F5 appears nowhere in the ROM, in either byte order, and every pattern pointer is a 16-bit word. It matches none of the 189 patterns that are drawn.</p>
+<p>Nine bytes at 0x61F5 decompress into a valid 16x16 sprite. The word 0x61F5 appears nowhere in the ROM, in either byte order, and every pattern pointer is a 16-bit word. It matches none of the 189 patterns that are drawn.</p>
 <h2 id="every-counter-at-zero-means-256">Every counter at zero means 256</h2>
 <p>The scripts are full of zero lengths, and they are not empty blocks: <code>djnz</code> with B at zero runs 256 times. Read them as zeros and the script goes out of step within a few blocks.</p>
 <h2 id="ply-and-msx-or-1up-and-2up">PLY and MSX, or 1UP and 2UP</h2>
 <p>With one player the board reads PLY and MSX; with two people, 1UP and 2UP — the six tiles at 0x7760 and the six at 0x7766. The court script leaves <b>CPU</b> written in that cell and the game paints over it.</p>
 <p>The alphabet is not ASCII: A is 0xD1 and on from there, with no Q, and with <b>X out of order at 0xE8</b>, behind the Y. Digits are 0xF0 plus the digit.</p>
+<h2 id="the-copy-protection-the-usual-one-in-the-house">The copy protection, the usual one in the house</h2>
+<p>The ROM&#x27;s only write into its own page is at 0x7A31 and lands on 0x409A, the <code>ret</code> of the interrupt handler. In ROM it does nothing; in a copy running from RAM that <code>ret</code> becomes a <code>nop</code>, the interrupt falls into INIT and the game restarts by itself. It fires on winning a game.</p>
+<p>Konami did this in many of its cartridges — the RC-701 carries the same idea with an <code>ldir</code> — so it is no oddity of this one. Here it is unpatched.</p>
+<h2 id="it-does-not-carry-konami-s-hidden-mark">It does not carry Konami&#x27;s hidden mark</h2>
+<p>Konami hid its catalogue number and the title in katakana at the end of many cartridges, at offset 0x3FF0; <b>Manuel Pazos</b> (<a href="https://twitter.com/ManuelPazosMSX">@ManuelPazosMSX</a>) found it. This one does not have it, and not for want of looking: all 16,384 positions were scanned with a finder first validated against cartridges of the same family that do carry it.</p>
 <footer><p><em>Hyper Rally</em> was published by Konami for the MSX; its catalogue number is RC-718 and it is 16 KB. All rights in the game remain with their holders. This is preservation, study and documentation work, and the cartridge image is not distributed.</p></footer></div>

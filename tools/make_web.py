@@ -38,18 +38,14 @@ def mil(n, idioma):
 TXT = {
     "es": dict(
         titulo="Konami's Tennis - desensamblado comentado",
-        aviso="<b>Aqui no hay ninguna ilustracion ni captura.</b> El rotulo, "
-              "la pista, los tenistas y hasta la cara del juez estan "
-              "<b>dibujados desde los bytes de la ROM</b>, ejecutando en "
-              "Python los mismos interpretes que corre el Z80, y comprobados "
-              "byte a byte contra la VRAM del emulador: <b>cero diferencias "
-              "en 137.260 bytes</b>, repartidos en doce volcados. El listado y "
-              "las cifras salen del binario y se reproducen con <code>make</code>.",
-        claim="Un cartucho de 16 KB que se defiende de las copias "
-              "escribiendo en si mismo, pinta los tres tercios de la pantalla "
-              "con un solo bucle, guarda la tabla de colores debajo de la de "
-              "patrones y le pone al juez de silla tres caras para que siga la "
-              "pelota con los ojos.",
+        aviso="<b>Aqui no hay ninguna captura.</b> Todas las imagenes estan "
+              "<b>dibujadas desde los bytes de la ROM</b>, ejecutando en Python "
+              "los mismos interpretes que corre el Z80, y comprobadas contra la "
+              "VRAM del emulador: <b>cero diferencias en 137.260 bytes</b>. El "
+              "listado y las cifras se reproducen con <code>make</code>.",
+        claim="Los tres tercios de la pantalla pintados con un solo bucle "
+              "que se lee a si mismo, la tabla de colores debajo de la de "
+              "patrones, y cada tenista montado con cinco sprites apilados.",
         ficha=["Konami - <b>(c) Konami 1984</b>",
                "Cartucho <b>RC-720</b>, 16 KB",
                "MSX1 - <b>pagina 1</b>", "Volcado <b>68bec817...</b>"],
@@ -78,19 +74,14 @@ TXT = {
     ),
     "en": dict(
         titulo="Konami's Tennis - a commented disassembly",
-        aviso="<b>There is not one illustration or capture here.</b> The "
-              "wordmark, the court, the players and even the umpire's face are "
-              "<b>drawn from the bytes of the ROM</b>, by running in Python "
-              "the same interpreters the Z80 runs, and checked byte for byte "
-              "against the emulator's VRAM: <b>zero differences across "
-              "137,260 bytes</b>, spread over twelve dumps. The listing and "
-              "the numbers come from the binary and are reproducible with "
-              "<code>make</code>.",
-        claim="A 16 KB cartridge that defends itself against copies by "
-              "writing on itself, paints the screen's three thirds with a "
-              "single loop, keeps the colour table underneath the pattern "
-              "table, and gives the chair umpire three faces so he can follow "
-              "the ball with his eyes.",
+        aviso="<b>Not one capture here.</b> Every picture is <b>drawn from "
+              "the bytes of the ROM</b>, by running in Python the same "
+              "interpreters the Z80 runs, and checked against the emulator's "
+              "VRAM: <b>zero differences across 137,260 bytes</b>. The listing "
+              "and the numbers are reproducible with <code>make</code>.",
+        claim="The screen's three thirds painted with a single loop that "
+              "reads its own output, the colour table underneath the pattern "
+              "table, and every player built from five stacked sprites.",
         ficha=["Konami - <b>(c) Konami 1984</b>",
                "An <b>RC-720</b> 16 KB cartridge",
                "MSX1 - <b>page 1</b>", "Dump <b>68bec817...</b>"],
@@ -122,249 +113,177 @@ TXT = {
 
 HALLAZGOS = {
     "es": [
-        ("Se defiende de las copias escribiendo en si mismo",
-         "<p>En toda la ROM hay <b>una sola</b> instruccion que escribe en la "
-         "pagina del propio cartucho, y esta en 0x7A31: <code>ld "
-         "(0409ah),a</code>, con A a cero. La direccion no es cualquiera: "
-         "<b>0x409A es el <code>ret</code> con el que acaba el manejador de "
-         "interrupcion</b>, y justo detras, en 0x409B, empieza INIT.</p>"
-         "<p>En un cartucho no pasa nada, porque la ROM no se deja escribir. "
-         "Pero en una copia cargada en RAM ese <code>ret</code> se convierte "
-         "en un <code>nop</code>: la interrupcion sigue de largo, cae en INIT "
-         "y <b>el juego se reinicia en cada cuadro</b>. No comprueba nada ni "
-         "avisa de nada; simplemente deja de funcionar.</p>"
-         "<p>Y salta tarde, al <b>ganar un juego</b>, con lo que una copia "
-         "parece buena durante un buen rato. Es la misma idea que gasta el "
-         "<b>RC-701</b> de esta misma serie, que alli va con un "
-         "<code>ldir</code> sobre el despachador; en este cartucho esta "
-         "<b>sin parchear y funcionando</b>.</p>"),
-        ("Los tres tercios de la pantalla, con un solo bucle",
-         "<p>SCREEN 2 del MSX son tres tercios independientes, y para que los "
-         "tres tengan lo mismo hay que escribirlo tres veces. 0x442D no lo "
-         "hace: copia de VRAM a VRAM byte a byte, y le mandan copiar "
-         "<b>4.095</b> bytes de 0x0000 a 0x0800.</p>"
-         "<p>Como el destino va 0x800 por delante del origen, cuando la copia "
-         "pasa del primer bloque esta leyendo <b>lo que ella misma acaba de "
-         "escribir</b>. Un solo bucle deja los tres tercios iguales, y el "
-         "cartucho se ahorra 4 KB de datos. Se hace dos veces: una para los "
-         "colores y otra para los patrones.</p>"),
-        ("La tabla de colores va DEBAJO de la de patrones",
-         "<p>Los ocho registros del VDP salen de la tabla de 0x45C9: "
-         "<code>02 E2 0E 7F 07 76 03 E1</code>. Los dos del medio son los que "
-         "enganan: en SCREEN 2 el TMS9918 no toma R3 y R4 como una direccion, "
-         "sino como <b>un bit de base y una mascara</b>.</p>"
-         "<p>Con R4 = 0x07 los <b>patrones</b> quedan en <b>0x2000</b>, y con "
-         "R3 = 0x7F los <b>colores</b> en <b>0x0000</b>: al reves de la "
-         "colocacion habitual. Leerlo del otro modo tiene un sintoma "
-         "reconocible - las formas se siguen reconociendo, porque los dos "
-         "bloques son simetricos, pero los colores salen a franjas.</p>"),
-        ("El juez de silla sigue la pelota con los ojos",
-         "<p>El juez no es un sprite: es un cuadro de <b>2x2 tiles</b> de la "
-         "tabla de nombres. Y cambia. 0x6ED2 mira donde esta la pelota "
-         "(0xE0B7), parte la pista en tres franjas con <b>0x48 y 0x78</b>, y "
-         "con eso elige una de las <b>tres caras</b> que hay en la tabla de "
-         "0x715D.</p>"
-         "<p>Las tres solo se diferencian en los ojos: mirando a un lado, al "
-         "otro, y al frente. Cuatro tiles reescritos y el juez sigue el "
-         "peloteo.</p>"),
-        ("Una figura no es un sprite: son cinco",
-         "<p>Cada postura del tenista son <b>cinco sprites de 16x16 "
-         "apilados</b>. 0x58A9 recorre cinco punteros seguidos "
-         "(<code>ld b,005h</code>) descomprimiendo 32 bytes en cada vuelta, y "
-         "0x58D4 salta esos diez bytes para llegar al sexto, que apunta a las "
-         "cinco parejas (y,x) con el sitio de cada capa.</p>"
-         "<p>La tabla de 0x5961 tiene 58 entradas -seis a cero, que son huecos "
-         "de verdad- y apuntan a <b>%d descripciones</b> distintas de doce "
-         "bytes, que entre todas gastan <b>%d patrones</b>. El color de cada "
-         "capa no esta ahi: sale de la ficha del jugador, y por eso las "
-         "jugadoras 3 y 4 llevan el pelo <b>magenta</b> donde las 1 y 2 lo "
-         "llevan negro.</p>" % (POSTURAS, PATRONES)),
-        ("El rival falla a proposito, con el registro de refresco",
-         "<p>Cuando la maquina decide a que punto de la pista ir, 0x6BE9 hace "
-         "<code>ld a,r</code>. R es el contador de refresco de la DRAM: lo "
-         "lleva el propio Z80 y avanza con cada instruccion, asi que su valor "
-         "en un instante cualquiera es impredecible. Rotado dos veces, es el "
-         "<b>temblor de la punteria del rival</b>.</p>"
-         "<p>Y no siempre: 0x6BEE mira el contador de cuadros y en la mitad de "
-         "los casos deja el fallo a cero. Sin generador de aleatorios, sin "
-         "semilla y sin una tabla que ocupe sitio.</p>"),
-        ("La dificultad sube con lo que dura el peloteo",
-         "<p>0xE20A cuenta los golpes que lleva el punto. 0x6E3B lo divide "
-         "por dos, lo topa en quince y con eso busca en una de las <b>tres "
-         "curvas de dieciseis pasos</b> de 0x6E67 - una por cada opcion del "
-         "GAME SELECT.</p>"
-         "<p>O sea que la maquina no juega igual todo el rato: <b>cuanto mas "
-         "se alarga el punto, mejor juega</b>. Y a partir del golpe treinta ya "
-         "no sube mas.</p>"),
-        ("Un descuido que deja seis bytes de codigo en la tabla de sprites",
-         "<p>0x4272 vuelca los atributos de los sprites del recogepelotas: "
-         "<code>ld hl,07890h / ld de,07b2ch / ld b,016h</code>. Pide "
-         "<b>22 bytes</b>. Pero en 0x7890 solo hay <b>16</b> de datos - cuatro "
-         "sprites de cuatro bytes -, y lo que sigue en 0x78A0 ya es codigo.</p>"
-         "<p>Asi que a la VRAM se van <b>los seis primeros bytes de la rutina "
-         "de 0x78A0</b> (<code>D9 21 2C 7B 11 60</code>), y ahi se quedan toda "
-         "la partida: se ven en el volcado del emulador, en 0x3B3C. Los "
-         "sprites 15 y 16 quedan con esa basura por atributos. No se nota "
-         "porque los patrones a los que apuntan estan <b>vacios</b>.</p>"),
-        ("Una raqueta que no dibuja nadie",
-         "<p>En 0x61F5 hay nueve bytes que se descomprimen a un sprite "
-         "perfectamente valido de 16x16: una raqueta pequena, con su aro y su "
-         "cordaje. Esta encajada entre dos patrones que si se usan.</p>"
-         "<p>Pero <b>no la apunta nadie</b>, y eso no es una impresion: la "
-         "palabra 0x61F5 <b>no aparece en ningun sitio de la ROM</b>, ni en "
-         "little endian ni en big endian, y todos los punteros a patron son "
-         "palabras de 16 bits. Tampoco coincide con ninguno de los %d "
-         "patrones que si se dibujan. Sobra en el cartucho.</p>" % PATRONES),
-        ("Todo contador a cero vale 256",
-         "<p>Los guiones de pantalla estan llenos de longitudes a cero, y no "
-         "son bloques vacios: el Z80 <b>decrementa antes de comprobar</b>, "
-         "asi que un <code>djnz</code> con B a cero da 256 vueltas.</p>"
-         "<p>Es la manera de escribir 256 en un byte, y el cartucho la usa en "
-         "todas partes: en las longitudes de los sub-bloques, en las cuentas "
-         "de repeticion, en el borrado de la tabla de nombres (0x441A, tres "
-         "vueltas de 256) y en el relleno de los patrones. Leer esos ceros "
-         "como ceros descuadra el guion entero a los pocos bloques.</p>"),
-        ("El marcador cambia de nombre segun quien juegue",
-         "<p>Con un jugador el marcador pone <b>PLY</b> y <b>MSX</b>; con dos "
-         "personas, <b>1UP</b> y <b>2UP</b>. Son los seis tiles de 0x7760 y "
-         "los seis de 0x7766, y 0x761A elige entre unos y otros.</p>"
-         "<p>Y hay un detalle: el guion de la pista deja escrito <b>CPU</b> en "
-         "esa casilla, y lo que se ve encima lo pinta el juego despues. El "
-         "alfabeto tampoco es ASCII - la A es 0xD1 y de ahi seguido, sin la Q, "
-         "y con la <b>X fuera de orden en 0xE8</b>, detras de la Y.</p>"),
-        ("No lleva la marca oculta de Konami",
-         "<p>Konami escondia al final de muchos cartuchos su numero de "
-         "catalogo y el titulo en katakana; lo descubrio <b>Manuel Pazos</b> "
-         "(<a href=\"https://twitter.com/ManuelPazosMSX\">@ManuelPazosMSX</a>) "
-         "y el bloque vive en el offset 0x3FF0. <b>Este no la lleva</b>, y no "
-         "por no mirar: se rastrearon las 16.384 posiciones de la ROM con un "
-         "buscador <b>validado antes contra cartuchos de la misma familia que "
-         "si la llevan</b> - los RC-718 y RC-729 de la serie sueltan la suya "
-         "al primer intento -, que es la unica manera de fiarse de un "
-         "negativo.</p>"),
+        ('Los tres tercios de la pantalla, con un solo bucle',
+         '<p>SCREEN 2 son tres tercios independientes, y para que los tres '
+         'tengan lo mismo hay que escribirlo tres veces. 0x442D copia de '
+         'VRAM a VRAM byte a byte, y le mandan <b>4.095</b> bytes de '
+         '0x0000 a 0x0800: como el destino va 0x800 por delante, pasado el '
+         'primer bloque esta leyendo lo que el mismo acaba de escribir. Un '
+         'bucle, tres tercios iguales, 4 KB ahorrados. Se hace dos veces: '
+         'colores y patrones.</p>'),
+        ('La tabla de colores va debajo de la de patrones',
+         '<p>En SCREEN 2 el TMS9918 no lee R3 y R4 como una direccion, '
+         'sino como un bit de base y una mascara. Con <code>R4 = '
+         '0x07</code> los patrones quedan en <b>0x2000</b> y con <code>R3 '
+         '= 0x7F</code> los colores en <b>0x0000</b>, al reves de lo '
+         'habitual.</p><p>Leerlo del otro modo tiene un sintoma que '
+         'engana: las formas se siguen reconociendo -los dos bloques son '
+         'simetricos- pero los colores salen a franjas.</p>'),
+        ('El juez de silla sigue la pelota con los ojos',
+         '<p>No es un sprite: son <b>2x2 tiles</b> de la tabla de nombres. '
+         '0x6ED2 mira donde esta la pelota, parte la pista en tres con '
+         '0x48 y 0x78, y elige una de las <b>tres caras</b> de 0x715D. '
+         'Solo cambian los ojos.</p>'),
+        ('Una figura no es un sprite: son cinco',
+         '<p>Cada postura son <b>cinco sprites de 16x16 apilados</b>. La '
+         'tabla de 0x5961 tiene 58 entradas que apuntan a <b>37 '
+         'descripciones</b> de doce bytes -cinco punteros a patron y uno a '
+         'las cinco parejas (y,x)-, y entre todas gastan <b>189 '
+         'patrones</b>.</p><p>El color no esta ahi: sale de la ficha del '
+         'jugador, y por eso las jugadoras 3 y 4 llevan el pelo '
+         '<b>magenta</b> donde las 1 y 2 lo llevan negro.</p>'),
+        ('El rival falla con el registro de refresco',
+         '<p>0x6BE9 hace <code>ld a,r</code>. R es el contador de refresco '
+         'de la DRAM, que el Z80 adelanta en cada instruccion, asi que no '
+         'se puede predecir. Rotado dos veces, es el temblor de la '
+         'punteria del rival -y 0x6BEE lo deja a cero en la mitad de los '
+         'cuadros.</p>'),
+        ('La dificultad sube con lo que dura el peloteo',
+         '<p>0xE20A cuenta los golpes del punto. 0x6E3B lo divide por dos, '
+         'lo topa en quince y lo busca en una de las <b>tres curvas de '
+         'dieciseis pasos</b> de 0x6E67, una por opcion del GAME SELECT. '
+         'Cuanto mas se alarga el punto, mejor juega la maquina; pasado el '
+         'golpe treinta ya no sube.</p>'),
+        ('Seis bytes de codigo en la tabla de sprites',
+         '<p>0x4272 pide <b>22 bytes</b> de atributos desde 0x7890, donde '
+         'solo hay <b>16</b> de datos: lo que sigue en 0x78A0 ya es '
+         'codigo. Asi que los seis primeros bytes de esa rutina acaban en '
+         'la VRAM 0x3B3C, y ahi se quedan toda la partida. No se nota '
+         'porque los patrones a los que apuntan estan vacios.</p>'),
+        ('Una raqueta que no dibuja nadie',
+         '<p>Nueve bytes en 0x61F5 se descomprimen a un sprite valido de '
+         '16x16. No la apunta nadie, y no es una impresion: la palabra '
+         '0x61F5 <b>no aparece en toda la ROM</b> en ninguno de los dos '
+         'ordenes de byte, y todos los punteros a patron son palabras de '
+         '16 bits. Tampoco coincide con ninguno de los 189 patrones que si '
+         'se dibujan.</p>'),
+        ('Todo contador a cero vale 256',
+         '<p>Los guiones estan llenos de longitudes a cero, y no son '
+         'bloques vacios: el Z80 decrementa antes de comprobar, asi que un '
+         '<code>djnz</code> con B a cero da 256 vueltas. Es como se '
+         'escribe 256 en un byte. Leerlas como ceros descuadra el guion a '
+         'los pocos bloques.</p>'),
+        ('El marcador cambia de nombre segun quien juegue',
+         '<p>Con un jugador pone <b>PLY</b> y <b>MSX</b>; con dos '
+         'personas, <b>1UP</b> y <b>2UP</b> -los seis tiles de 0x7760 y '
+         'los seis de 0x7766. El guion de la pista deja escrito <b>CPU</b> '
+         'ahi, y el juego lo tapa despues.</p><p>El alfabeto tampoco es '
+         'ASCII: la A es 0xD1 y de ahi seguido, sin la Q, y con la <b>X '
+         'fuera de orden en 0xE8</b>, detras de la Y.</p>'),
+        ('La proteccion anticopia, la de siempre en la casa',
+         '<p>La unica escritura de toda la ROM a su propia pagina esta en '
+         '0x7A31 y cae sobre 0x409A, que es el <code>ret</code> del '
+         'manejador de interrupcion. En ROM no hace nada; en una copia en '
+         'RAM ese <code>ret</code> se vuelve <code>nop</code>, la '
+         'interrupcion cae en INIT y el juego se reinicia solo. Salta al '
+         'ganar un juego.</p><p>Konami lo hacia en muchos de sus cartuchos '
+         '-el <b>RC-701</b> lleva la misma idea con un <code>ldir</code>-, '
+         'asi que no es una rareza de este. Aqui esta sin parchear.</p>'),
+        ('No lleva la marca oculta de Konami',
+         '<p>Konami escondia su numero de catalogo y el titulo en katakana '
+         'al final de muchos cartuchos, en el offset 0x3FF0; lo descubrio '
+         '<b>Manuel Pazos</b> (<a '
+         'href="https://twitter.com/ManuelPazosMSX">@ManuelPazosMSX</a>). '
+         'Este no la lleva, y no por no mirar: se rastrearon las 16.384 '
+         'posiciones con un buscador validado antes contra cartuchos de la '
+         'misma familia que si la llevan, que es la unica manera de fiarse '
+         'de un negativo.</p>'),
     ],
     "en": [
-        ("It defends itself against copies by writing on itself",
-         "<p>In the whole ROM there is <b>exactly one</b> instruction that "
-         "writes into the cartridge's own page, and it sits at 0x7A31: "
-         "<code>ld (0409ah),a</code>, with A zero. The address is not just "
-         "any address: <b>0x409A is the <code>ret</code> that ends the "
-         "interrupt handler</b>, and right behind it, at 0x409B, INIT "
-         "begins.</p>"
-         "<p>In a cartridge nothing happens, because ROM will not take a "
-         "write. But in a copy loaded into RAM that <code>ret</code> becomes a "
-         "<code>nop</code>: the interrupt runs straight on, falls into INIT, "
-         "and <b>the game restarts on every frame</b>. It checks nothing and "
-         "warns of nothing; it simply stops working.</p>"
-         "<p>And it fires late, on <b>winning a game</b>, so a copy looks fine "
-         "for a good while. It is the same idea the <b>RC-701</b> of this "
-         "series uses, where it goes with an <code>ldir</code> over the "
-         "dispatcher; in this cartridge it is <b>unpatched and working</b>.</p>"),
         ("The screen's three thirds, with a single loop",
-         "<p>The MSX's SCREEN 2 is three independent thirds, and for all three "
-         "to hold the same thing you have to write it three times. 0x442D does "
-         "not: it copies VRAM to VRAM byte by byte, and is told to copy "
-         "<b>4,095</b> bytes from 0x0000 to 0x0800.</p>"
-         "<p>Since the destination runs 0x800 ahead of the source, once the "
-         "copy passes the first block it is reading <b>what it has just "
-         "written itself</b>. One loop leaves the three thirds identical, and "
-         "the cartridge saves 4 KB of data. It is done twice: once for the "
-         "colours and once for the patterns.</p>"),
-        ("The colour table sits UNDERNEATH the pattern table",
-         "<p>The VDP's eight registers come from the table at 0x45C9: "
-         "<code>02 E2 0E 7F 07 76 03 E1</code>. The two in the middle are the "
-         "deceptive ones: in SCREEN 2 the TMS9918 does not read R3 and R4 as "
-         "an address, but as <b>a base bit and a mask</b>.</p>"
-         "<p>With R4 = 0x07 the <b>patterns</b> land at <b>0x2000</b>, and "
-         "with R3 = 0x7F the <b>colours</b> at <b>0x0000</b>: the reverse of "
-         "the usual layout. Reading it the other way has a recognisable "
-         "symptom - the shapes still read, because the two blocks are "
-         "symmetric, but the colours come out in bands.</p>"),
-        ("The chair umpire follows the ball with his eyes",
-         "<p>The umpire is not a sprite: he is a <b>2x2 tile</b> block of the "
-         "name table. And he changes. 0x6ED2 looks at where the ball is "
-         "(0xE0B7), splits the court into three bands with <b>0x48 and "
-         "0x78</b>, and picks one of the <b>three faces</b> in the table at "
-         "0x715D.</p>"
-         "<p>The three differ only in the eyes: looking one way, the other, "
-         "and straight ahead. Four tiles rewritten and the umpire follows the "
-         "rally.</p>"),
-        ("A figure is not one sprite: it is five",
-         "<p>Every player pose is <b>five stacked 16x16 sprites</b>. 0x58A9 "
-         "walks five consecutive pointers (<code>ld b,005h</code>) "
-         "decompressing 32 bytes each time round, and 0x58D4 skips those ten "
-         "bytes to reach the sixth, which points at the five (y,x) pairs "
-         "giving each layer its place.</p>"
-         "<p>The table at 0x5961 has 58 entries - six of them zero, which are "
-         "real gaps - pointing at <b>%d</b> distinct twelve-byte descriptions, "
-         "which between them spend <b>%d patterns</b>. The colour of each "
-         "layer is not there: it comes from the player's record, which is why "
-         "players 3 and 4 have <b>magenta</b> hair where 1 and 2 have "
-         "black.</p>" % (POSTURAS, PATRONES)),
-        ("The opponent misses on purpose, using the refresh register",
-         "<p>When the machine decides which spot on the court to head for, "
-         "0x6BE9 does <code>ld a,r</code>. R is the DRAM refresh counter: the "
-         "Z80 keeps it itself and it advances with every instruction, so its "
-         "value at any given moment is unpredictable. Rotated twice, it is the "
-         "<b>wobble in the opponent's aim</b>.</p>"
-         "<p>And not always: 0x6BEE checks the frame counter and half the time "
-         "leaves the error at zero. No random generator, no seed, and no table "
-         "taking up room.</p>"),
-        ("The difficulty rises with how long the rally lasts",
-         "<p>0xE20A counts the strokes in the current point. 0x6E3B halves it, "
-         "caps it at fifteen and uses that to index one of the <b>three "
-         "sixteen-step curves</b> at 0x6E67 - one per GAME SELECT option.</p>"
-         "<p>So the machine does not play the same all the way through: "
-         "<b>the longer the point runs, the better it plays</b>. Past the "
-         "thirtieth stroke it stops rising.</p>"),
-        ("A slip that leaves six bytes of code in the sprite table",
-         "<p>0x4272 dumps the ball boy's sprite attributes: <code>ld "
-         "hl,07890h / ld de,07b2ch / ld b,016h</code>. It asks for <b>22 "
-         "bytes</b>. But at 0x7890 there are only <b>16</b> of data - four "
-         "sprites of four bytes - and what follows at 0x78A0 is already "
-         "code.</p>"
-         "<p>So <b>the first six bytes of the routine at 0x78A0</b> "
-         "(<code>D9 21 2C 7B 11 60</code>) go into VRAM, and there they stay "
-         "for the whole match: you can see them in the emulator dump, at "
-         "0x3B3C. Sprites 15 and 16 end up with that rubbish for attributes. "
-         "It does not show, because the patterns they point at are "
-         "<b>empty</b>.</p>"),
-        ("A racket nobody draws",
-         "<p>At 0x61F5 there are nine bytes that decompress into a perfectly "
-         "valid 16x16 sprite: a small racket, with its head and its strings. "
-         "It is wedged between two patterns that are used.</p>"
-         "<p>But <b>nothing points at it</b>, and that is not an impression: "
-         "the word 0x61F5 <b>appears nowhere in the ROM</b>, neither little "
-         "endian nor big endian, and every pattern pointer is a 16-bit word. "
-         "Nor does it match any of the %d patterns that are drawn. It is spare "
-         "in the cartridge.</p>" % PATRONES),
-        ("Every counter at zero means 256",
-         "<p>The screen scripts are full of zero lengths, and they are not "
-         "empty blocks: the Z80 <b>decrements before it tests</b>, so a "
-         "<code>djnz</code> with B at zero runs 256 times.</p>"
-         "<p>It is how you write 256 in one byte, and the cartridge uses it "
-         "everywhere: in sub-block lengths, in repeat counts, in clearing the "
-         "name table (0x441A, three rounds of 256) and in padding patterns. "
-         "Read those zeros as zeros and the whole script goes out of step "
-         "within a few blocks.</p>"),
-        ("The scoreboard changes its names depending on who is playing",
-         "<p>With one player the board reads <b>PLY</b> and <b>MSX</b>; with "
-         "two people, <b>1UP</b> and <b>2UP</b>. They are the six tiles at "
-         "0x7760 and the six at 0x7766, and 0x761A picks between them.</p>"
-         "<p>And there is a detail: the court script leaves <b>CPU</b> written "
-         "in that cell, and what you see on top the game paints afterwards. "
-         "The alphabet is not ASCII either - A is 0xD1 and on from there, with "
-         "no Q, and with <b>X out of order at 0xE8</b>, behind the Y.</p>"),
+         '<p>SCREEN 2 is three independent thirds, and for all three to '
+         'hold the same thing you have to write it three times. 0x442D '
+         'copies VRAM to VRAM byte by byte, and is given <b>4,095</b> '
+         'bytes from 0x0000 to 0x0800: since the destination runs 0x800 '
+         'ahead, past the first block it is reading what it has just '
+         'written. One loop, three identical thirds, 4 KB saved. Done '
+         'twice: colours and patterns.</p>'),
+        ('The colour table sits underneath the pattern table',
+         '<p>In SCREEN 2 the TMS9918 does not read R3 and R4 as an '
+         'address, but as a base bit and a mask. With <code>R4 = '
+         '0x07</code> the patterns land at <b>0x2000</b> and with <code>R3 '
+         '= 0x7F</code> the colours at <b>0x0000</b>, the reverse of the '
+         'usual layout.</p><p>Reading it the other way has a deceptive '
+         'symptom: the shapes still read -the two blocks are symmetric- '
+         'but the colours come out in bands.</p>'),
+        ('The chair umpire follows the ball with his eyes',
+         '<p>He is not a sprite: he is <b>2x2 tiles</b> of the name table. '
+         '0x6ED2 looks at where the ball is, splits the court into three '
+         'with 0x48 and 0x78, and picks one of the <b>three faces</b> at '
+         '0x715D. Only the eyes change.</p>'),
+        ('A figure is not one sprite: it is five',
+         '<p>Every pose is <b>five stacked 16x16 sprites</b>. The table at '
+         '0x5961 has 58 entries pointing at <b>37</b> twelve-byte '
+         'descriptions -five pattern pointers and one to the five (y,x) '
+         'pairs- which between them spend <b>189 patterns</b>.</p><p>The '
+         "colour is not there: it comes from the player's record, which is "
+         'why players 3 and 4 have <b>magenta</b> hair where 1 and 2 have '
+         'black.</p>'),
+        ('The opponent misses using the refresh register',
+         '<p>0x6BE9 does <code>ld a,r</code>. R is the DRAM refresh '
+         'counter, which the Z80 advances on every instruction, so it '
+         'cannot be predicted. Rotated twice, it is the wobble in the '
+         "opponent's aim -and 0x6BEE leaves it at zero on half the "
+         'frames.</p>'),
+        ('The difficulty rises with the rally',
+         "<p>0xE20A counts the point's strokes. 0x6E3B halves it, caps it "
+         'at fifteen and looks it up in one of the <b>three sixteen-step '
+         'curves</b> at 0x6E67, one per GAME SELECT option. The longer the '
+         'point runs, the better the machine plays; past the thirtieth '
+         'stroke it stops.</p>'),
+        ('Six bytes of code in the sprite table',
+         '<p>0x4272 asks for <b>22 bytes</b> of attributes from 0x7890, '
+         'where there are only <b>16</b> of data: what follows at 0x78A0 '
+         'is already code. So the first six bytes of that routine end up '
+         'in VRAM at 0x3B3C, and there they stay for the whole match. It '
+         'does not show, because the patterns they point at are empty.</p>'),
+        ('A racket nobody draws',
+         '<p>Nine bytes at 0x61F5 decompress into a valid 16x16 sprite. '
+         'Nothing points at it, and that is not an impression: the word '
+         '0x61F5 <b>appears nowhere in the ROM</b> in either byte order, '
+         'and every pattern pointer is a 16-bit word. Nor does it match '
+         'any of the 189 patterns that are drawn.</p>'),
+        ('Every counter at zero means 256',
+         '<p>The scripts are full of zero lengths, and they are not empty '
+         'blocks: the Z80 decrements before it tests, so a '
+         '<code>djnz</code> with B at zero runs 256 times. It is how you '
+         'write 256 in one byte. Read them as zeros and the script goes '
+         'out of step within a few blocks.</p>'),
+        ('The scoreboard changes its names depending on who is playing',
+         '<p>With one player it reads <b>PLY</b> and <b>MSX</b>; with two '
+         'people, <b>1UP</b> and <b>2UP</b> -the six tiles at 0x7760 and '
+         'the six at 0x7766. The court script leaves <b>CPU</b> written '
+         'there, and the game paints over it.</p><p>The alphabet is not '
+         'ASCII either: A is 0xD1 and on from there, with no Q, and with '
+         '<b>X out of order at 0xE8</b>, behind the Y.</p>'),
+        ('The copy protection, the usual one in the house',
+         "<p>The ROM's only write into its own page is at 0x7A31 and lands "
+         'on 0x409A, the <code>ret</code> of the interrupt handler. In ROM '
+         'it does nothing; in a copy running from RAM that '
+         '<code>ret</code> becomes a <code>nop</code>, the interrupt falls '
+         'into INIT and the game restarts by itself. It fires on winning a '
+         'game.</p><p>Konami did this in many of its cartridges -the '
+         '<b>RC-701</b> carries the same idea with an <code>ldir</code>- '
+         'so it is no oddity of this one. Here it is unpatched.</p>'),
         ("It does not carry Konami's hidden mark",
-         "<p>At the end of many cartridges Konami hid its catalogue number and "
-         "the title in katakana; <b>Manuel Pazos</b> "
-         "(<a href=\"https://twitter.com/ManuelPazosMSX\">@ManuelPazosMSX</a>) "
-         "found it, and the block lives at offset 0x3FF0. <b>This one does not "
-         "have it</b>, and not for want of looking: all 16,384 positions were "
-         "scanned with a finder <b>first validated against cartridges of the "
-         "same family that do carry it</b> - the RC-718 and RC-729 of this "
-         "series give theirs up on the first try - which is the only way to "
-         "trust a negative.</p>"),
+         '<p>Konami hid its catalogue number and the title in katakana at '
+         'the end of many cartridges, at offset 0x3FF0; <b>Manuel '
+         'Pazos</b> (<a '
+         'href="https://twitter.com/ManuelPazosMSX">@ManuelPazosMSX</a>) '
+         'found it. This one does not have it, and not for want of '
+         'looking: all 16,384 positions were scanned with a finder first '
+         'validated against cartridges of the same family that do carry '
+         'it, which is the only way to trust a negative.</p>'),
     ],
 }
 

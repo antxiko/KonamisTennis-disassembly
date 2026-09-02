@@ -59,7 +59,7 @@ interpreters the Z80 runs, and they are checked against openMSX's VRAM across
 | [The game](docs/THE-GAME.md) | two menus, four 41-byte player records and the tennis count |
 | [The cartridge](docs/THE-CARTRIDGE.md) | the header, the colour table underneath the patterns, and why it carries no hidden mark |
 | [The code](docs/THE-CODE.md) | the two screen interpreters, the five-sprite figures and the sound |
-| [Findings](docs/FINDINGS.md) | the copy protection, the umpire's eyes and a racket nobody draws |
+| [Findings](docs/FINDINGS.md) | one loop for three thirds, the umpire's eyes and a racket nobody draws |
 | [In the emulator](docs/IN-THE-EMULATOR.md) | what can be measured, and how |
 | [Open questions](docs/OPEN-QUESTIONS.md) | what is not settled yet |
 

@@ -59,7 +59,7 @@ largo de **137.260 bytes con cero diferencias**.
 | [El juego](docs/es/EL-JUEGO.md) | dos menús, cuatro fichas de 41 bytes y la cuenta del tenis |
 | [El cartucho](docs/es/EL-CARTUCHO.md) | la cabecera, la tabla de colores debajo de los patrones, y por qué no lleva la marca oculta |
 | [El código](docs/es/EL-CODIGO.md) | los dos intérpretes de pantalla, las figuras de cinco sprites y el sonido |
-| [Hallazgos](docs/es/HALLAZGOS.md) | la protección anticopia, los ojos del juez y una raqueta que no dibuja nadie |
+| [Hallazgos](docs/es/HALLAZGOS.md) | un bucle para tres tercios, los ojos del juez y una raqueta que no dibuja nadie |
 | [En el emulador](docs/es/EN-EL-EMULADOR.md) | qué se puede medir, y cómo |
 | [Preguntas abiertas](docs/es/PREGUNTAS-ABIERTAS.md) | lo que no está cerrado |
 
