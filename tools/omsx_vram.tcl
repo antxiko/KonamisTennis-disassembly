@@ -23,7 +23,7 @@ proc opcion {nombre porDefecto} {
     return $porDefecto
 }
 
-set ::SALIDA [opcion TENNIS_SALIDA {C:/Users/Antxiko/Documents/DES_ASM/TENNIS_DISAM/work/omsx}]
+set ::SALIDA [opcion TENNIS_SALIDA {C:/Users/Antxiko/Documents/DES_ASM/desensamblados/TENNIS_DISAM/work/omsx}]
 file mkdir $::SALIDA
 set ::n 0
 
