@@ -67,3 +67,25 @@ vibrato, `0xEx` octava, `0xFx` ancho del vibrato, `0xFE` sube una octava, `0xFF`
 se acabó. Cualquier otro byte es una nota —nibble alto el semitono, bajo la
 duración— y el periodo sale de la escala de doce de 0x7C5D, doblado una vez por
 octava.
+
+## Código compartido con otros cartuchos de Konami
+
+Este desensamblado se ha comparado, instrucción por instrucción, con
+todos los demás de Konami de la serie. Cuenta un bloque cuando las
+mismas instrucciones, al menos seis desde una etiqueta hasta su `ret`
+o su salto sin condición, están en los dos cartuchos; las direcciones
+no se miran, porque cambian de un cartucho a otro. De los otros 57,
+**33** tienen al menos un bloque en común con este; estos son los
+que más comparten:
+
+| Cartucho | Bloques | Instrucciones | Por ejemplo (aquí = allí) |
+|---|---:|---:|---|
+| [Konami's Baseball](https://antxiko.github.io/KonamisBaseball-disassembly/es/) | 32 | 518 | `manda_de_la_melodia` (0x7BE8) = `lee_una_nota_larga` |
+| [Konami's Golf](https://antxiko.github.io/KonamisGolf-disassembly/es/) | 25 | 405 | `manda_de_la_melodia` (0x7BE8) = `corre_el_canal_nota_larga` |
+| [Hyper Olympic 1](https://antxiko.github.io/HyperOlympic1-disassembly/es/) | 22 | 312 | `replica_vram` (0x442D) = `COPIA_VRAM_A_VRAM` |
+| [Hyper Olympic 2](https://antxiko.github.io/HyperOlympic2-disassembly/es/) | 22 | 312 | `replica_vram` (0x442D) = `COPIA_VRAM_A_VRAM` |
+| [Konami's Ping Pong](https://antxiko.github.io/KonamisPingPong-disassembly/es/) | 5 | 49 | `enciende_canal` (0x7AD6) = `pon_el_mezclador` |
+
+La matriz entera, los 58 cartuchos entre sí, está en
+[Las rutinas](https://antxiko.github.io/MSX-disassembly-database/es/LAS-RUTINAS.html) de la base de datos de la
+serie, con el método y el programa que la mide.

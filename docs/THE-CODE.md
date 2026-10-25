@@ -63,3 +63,25 @@ high nibble of each byte: `0x1x` duration, `0x2x` volume, `0xDx` vibrato step,
 `0xEx` octave, `0xFx` vibrato width, `0xFE` up an octave, `0xFF` end. Anything
 else is a note — high nibble the semitone, low nibble the duration — and the
 period comes from the twelve-entry scale at 0x7C5D, doubled once per octave.
+
+## Code shared with other Konami cartridges
+
+This disassembly has been compared, instruction by instruction, with
+every other Konami one in the series. A block counts when the same
+instructions, at least six of them from a label to its `ret` or its
+unconditional jump, are in both cartridges; the addresses are left
+aside, because they change from one cartridge to the next. Of the
+other 57, **33** have at least one block in common with this one;
+these are the ones that share the most:
+
+| Cartridge | Blocks | Instructions | For example (here = there) |
+|---|---:|---:|---|
+| [Konami's Baseball](https://antxiko.github.io/KonamisBaseball-disassembly/) | 32 | 518 | `manda_de_la_melodia` (0x7BE8) = `lee_una_nota_larga` |
+| [Konami's Golf](https://antxiko.github.io/KonamisGolf-disassembly/) | 25 | 405 | `manda_de_la_melodia` (0x7BE8) = `corre_el_canal_nota_larga` |
+| [Hyper Olympic 1](https://antxiko.github.io/HyperOlympic1-disassembly/) | 22 | 312 | `replica_vram` (0x442D) = `COPIA_VRAM_A_VRAM` |
+| [Hyper Olympic 2](https://antxiko.github.io/HyperOlympic2-disassembly/) | 22 | 312 | `replica_vram` (0x442D) = `COPIA_VRAM_A_VRAM` |
+| [Konami's Ping Pong](https://antxiko.github.io/KonamisPingPong-disassembly/) | 5 | 49 | `enciende_canal` (0x7AD6) = `pon_el_mezclador` |
+
+The whole matrix, the 58 cartridges against each other, is on
+[The routines](https://antxiko.github.io/MSX-disassembly-database/THE-ROUTINES.html) in the series database, along
+with the method and the program that measures it.
